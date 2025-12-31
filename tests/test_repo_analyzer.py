@@ -206,26 +206,29 @@ def get_item(item_id: int):
         assert "Endpoint: /users" in routes
         assert "Endpoint: /items/{item_id}" in routes
 
-    def test_extract_express_routes(self, analyzer_with_repo, temp_repo):
-        server_js = temp_repo / "server.js"
-        server_js.write_text("""
-const express = require('express');
-const app = express();
+    def test_extract_routes_with_routers(self, analyzer_with_repo, temp_repo):
+        routers = temp_repo / "routers"
+        routers.mkdir()
+        auth_py = routers / "auth.py"
+        auth_py.write_text("""
+from fastapi import APIRouter
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
-});
+router = APIRouter(prefix="/auth")
 
-router.post('/api/users', async (req, res) => {
-    // create user
-});
+@router.post("/login")
+def login():
+    pass
+
+@router.post("/register")
+def register():
+    pass
 """)
 
         features = analyzer_with_repo.extract_features()
 
         routes = {f.summary for f in features}
-        assert "Endpoint: /api/health" in routes
-        assert "Endpoint: /api/users" in routes
+        assert any("/login" in r for r in routes)
+        assert any("/register" in r for r in routes)
 
 
 class TestModuleExtraction:
@@ -310,5 +313,5 @@ def root():
         assert facts["repo"]["commit"] == "abc123"
         assert len(facts["languages"]) > 0
         assert len(facts["frameworks"]) > 0
-        assert len(facts["features"]) > 0
+        assert facts["api"]["total_count"] > 0
         assert len(facts["runtime"]["dependencies"]) > 0

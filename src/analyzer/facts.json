@@ -3,12 +3,13 @@
   "repo": {
     "url": "https://github.com/HubMan17/shop-co-ecommerce",
     "commit": "6e82108f552adacc66cf2c89cd39664c0843ee39",
-    "detected_at": "2025-12-31T15:18:55.859708Z"
+    "detected_at": "2025-12-31T16:09:08.804035Z"
   },
   "languages": [
     {
       "name": "Python",
-      "ratio": 0.71,
+      "ratio": 0.44,
+      "lines_of_code": 1504,
       "evidence": [
         {
           "path": "*.py"
@@ -16,8 +17,19 @@
       ]
     },
     {
+      "name": "Vue",
+      "ratio": 0.42,
+      "lines_of_code": 1449,
+      "evidence": [
+        {
+          "path": "*.vue"
+        }
+      ]
+    },
+    {
       "name": "TypeScript",
-      "ratio": 0.23,
+      "ratio": 0.13,
+      "lines_of_code": 446,
       "evidence": [
         {
           "path": "*.ts"
@@ -29,7 +41,8 @@
     },
     {
       "name": "JavaScript",
-      "ratio": 0.06,
+      "ratio": 0.01,
+      "lines_of_code": 27,
       "evidence": [
         {
           "path": "*.js"
@@ -46,7 +59,7 @@
       "type": "web",
       "evidence": [
         {
-          "path": "backend\\requirements.txt"
+          "path": "backend/requirements.txt"
         }
       ]
     },
@@ -55,7 +68,7 @@
       "type": "server",
       "evidence": [
         {
-          "path": "backend\\requirements.txt"
+          "path": "backend/requirements.txt"
         }
       ]
     },
@@ -64,7 +77,7 @@
       "type": "orm",
       "evidence": [
         {
-          "path": "backend\\requirements.txt"
+          "path": "backend/requirements.txt"
         }
       ]
     },
@@ -73,7 +86,7 @@
       "type": "validation",
       "evidence": [
         {
-          "path": "backend\\requirements.txt"
+          "path": "backend/requirements.txt"
         }
       ]
     },
@@ -82,7 +95,25 @@
       "type": "frontend",
       "evidence": [
         {
-          "path": "frontend\\package.json"
+          "path": "frontend/package.json"
+        }
+      ]
+    },
+    {
+      "name": "Axios",
+      "type": "http-client",
+      "evidence": [
+        {
+          "path": "frontend/package.json"
+        }
+      ]
+    },
+    {
+      "name": "Pinia",
+      "type": "state-management",
+      "evidence": [
+        {
+          "path": "frontend/package.json"
         }
       ]
     },
@@ -91,7 +122,7 @@
       "type": "styling",
       "evidence": [
         {
-          "path": "frontend\\package.json"
+          "path": "frontend/package.json"
         }
       ]
     }
@@ -99,9 +130,41 @@
   "architecture": {
     "type": "client-server",
     "layers": [
-      "frontend",
-      "backend"
+      "data",
+      "backend",
+      "frontend"
     ],
+    "details": {
+      "separation": "monorepo",
+      "api_type": "REST",
+      "database": {
+        "type": "relational",
+        "orm": "Sqlalchemy",
+        "evidence": [
+          "backend/requirements.txt",
+          "backend/requirements.txt"
+        ]
+      },
+      "auth": {
+        "type": "JWT",
+        "library": "python-jose",
+        "evidence": [
+          "backend/requirements.txt"
+        ]
+      },
+      "http_client": {
+        "name": "axios",
+        "evidence": [
+          "frontend/package.json"
+        ]
+      },
+      "state_management": {
+        "name": "Pinia",
+        "evidence": [
+          "frontend/package.json"
+        ]
+      }
+    },
     "evidence": [
       {
         "path": "backend",
@@ -115,123 +178,710 @@
   },
   "modules": [
     {
-      "name": "backend",
-      "role": "backend",
+      "name": "app",
+      "role": "module",
+      "path": "backend/app",
+      "submodules": [
+        "models:orm-models",
+        "routers:api-routing",
+        "schemas:data-schemas",
+        "services:business-logic",
+        "utils:utilities"
+      ],
       "evidence": [
         {
-          "path": "backend"
+          "path": "backend/app"
         }
       ]
     },
     {
-      "name": "frontend",
-      "role": "frontend",
+      "name": "public",
+      "role": "static-files",
+      "path": "frontend/public",
+      "submodules": [],
       "evidence": [
         {
-          "path": "frontend"
+          "path": "frontend/public"
+        }
+      ]
+    },
+    {
+      "name": "src",
+      "role": "module",
+      "path": "frontend/src",
+      "submodules": [
+        "assets:assets",
+        "components:ui-components",
+        "router:routing",
+        "services:business-logic",
+        "stores:state-management",
+        "types:type-definitions",
+        "views:views"
+      ],
+      "evidence": [
+        {
+          "path": "frontend/src"
         }
       ]
     }
   ],
-  "features": [
+  "api": {
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/",
+        "full_path": "/",
+        "handler": "root",
+        "router": "app",
+        "file": "backend/app/main.py",
+        "tags": [],
+        "auth_required": false,
+        "description": ""
+      },
+      {
+        "method": "GET",
+        "path": "/api/health",
+        "full_path": "/api/health",
+        "handler": "health",
+        "router": "app",
+        "file": "backend/app/main.py",
+        "tags": [],
+        "auth_required": false,
+        "description": ""
+      },
+      {
+        "method": "POST",
+        "path": "/register",
+        "full_path": "/api/auth/register",
+        "handler": "register",
+        "router": "router",
+        "file": "backend/app/routers/auth.py",
+        "tags": [
+          "Authentication"
+        ],
+        "auth_required": false,
+        "description": ""
+      },
+      {
+        "method": "POST",
+        "path": "/login",
+        "full_path": "/api/auth/login",
+        "handler": "login",
+        "router": "router",
+        "file": "backend/app/routers/auth.py",
+        "tags": [
+          "Authentication"
+        ],
+        "auth_required": false,
+        "description": ""
+      },
+      {
+        "method": "GET",
+        "path": "/me",
+        "full_path": "/api/auth/me",
+        "handler": "get_me",
+        "router": "router",
+        "file": "backend/app/routers/auth.py",
+        "tags": [
+          "Authentication"
+        ],
+        "auth_required": true,
+        "description": ""
+      },
+      {
+        "method": "POST",
+        "path": "/items",
+        "full_path": "/api/cart/items",
+        "handler": "add_to_cart",
+        "router": "router",
+        "file": "backend/app/routers/cart.py",
+        "tags": [
+          "Cart"
+        ],
+        "auth_required": true,
+        "description": ""
+      },
+      {
+        "method": "PUT",
+        "path": "/items/{item_id}",
+        "full_path": "/api/cart/items/{item_id}",
+        "handler": "update_cart_item",
+        "router": "router",
+        "file": "backend/app/routers/cart.py",
+        "tags": [
+          "Cart"
+        ],
+        "auth_required": true,
+        "description": ""
+      },
+      {
+        "method": "DELETE",
+        "path": "/items/{item_id}",
+        "full_path": "/api/cart/items/{item_id}",
+        "handler": "remove_cart_item",
+        "router": "router",
+        "file": "backend/app/routers/cart.py",
+        "tags": [
+          "Cart"
+        ],
+        "auth_required": true,
+        "description": ""
+      },
+      {
+        "method": "GET",
+        "path": "/{slug}",
+        "full_path": "/api/categories/{slug}",
+        "handler": "get_category",
+        "router": "router",
+        "file": "backend/app/routers/categories.py",
+        "tags": [
+          "Categories"
+        ],
+        "auth_required": false,
+        "description": ""
+      },
+      {
+        "method": "GET",
+        "path": "/{order_id}",
+        "full_path": "/api/orders/{order_id}",
+        "handler": "get_order",
+        "router": "router",
+        "file": "backend/app/routers/orders.py",
+        "tags": [
+          "Orders"
+        ],
+        "auth_required": true,
+        "description": ""
+      },
+      {
+        "method": "GET",
+        "path": "/new-arrivals",
+        "full_path": "/api/products/new-arrivals",
+        "handler": "get_new_arrivals",
+        "router": "router",
+        "file": "backend/app/routers/products.py",
+        "tags": [
+          "Products"
+        ],
+        "auth_required": false,
+        "description": ""
+      },
+      {
+        "method": "GET",
+        "path": "/top-selling",
+        "full_path": "/api/products/top-selling",
+        "handler": "get_top_selling",
+        "router": "router",
+        "file": "backend/app/routers/products.py",
+        "tags": [
+          "Products"
+        ],
+        "auth_required": false,
+        "description": ""
+      },
+      {
+        "method": "GET",
+        "path": "/{slug}",
+        "full_path": "/api/products/{slug}",
+        "handler": "get_product",
+        "router": "router",
+        "file": "backend/app/routers/products.py",
+        "tags": [
+          "Products"
+        ],
+        "auth_required": false,
+        "description": ""
+      }
+    ],
+    "total_count": 13
+  },
+  "frontend_routes": [
     {
-      "id": "root",
-      "summary": "Endpoint: /",
-      "evidence": [
-        {
-          "path": "backend\\app\\main.py"
-        }
-      ]
+      "path": "/shop",
+      "name": "",
+      "component": "",
+      "file": "frontend/src/components/layout/TheHeader.vue",
+      "auth_required": false
     },
     {
-      "id": "api_health",
-      "summary": "Endpoint: /api/health",
-      "evidence": [
-        {
-          "path": "backend\\app\\main.py"
-        }
-      ]
+      "path": "/",
+      "name": "home",
+      "component": "HomeView",
+      "file": "frontend/src/router/index.ts",
+      "auth_required": false
     },
     {
-      "id": "register",
-      "summary": "Endpoint: /register",
-      "evidence": [
-        {
-          "path": "backend\\app\\routers\\auth.py"
-        }
-      ]
+      "path": "/shop",
+      "name": "shop",
+      "component": "CatalogView",
+      "file": "frontend/src/router/index.ts",
+      "auth_required": false
     },
     {
-      "id": "login",
-      "summary": "Endpoint: /login",
-      "evidence": [
-        {
-          "path": "backend\\app\\routers\\auth.py"
-        }
-      ]
+      "path": "/shop/:category",
+      "name": "category",
+      "component": "CatalogView",
+      "file": "frontend/src/router/index.ts",
+      "auth_required": false
     },
     {
-      "id": "me",
-      "summary": "Endpoint: /me",
-      "evidence": [
-        {
-          "path": "backend\\app\\routers\\auth.py"
-        }
-      ]
+      "path": "/product/:slug",
+      "name": "product",
+      "component": "ProductView",
+      "file": "frontend/src/router/index.ts",
+      "auth_required": false
     },
     {
-      "id": "items",
-      "summary": "Endpoint: /items",
-      "evidence": [
-        {
-          "path": "backend\\app\\routers\\cart.py"
-        }
-      ]
+      "path": "/cart",
+      "name": "cart",
+      "component": "CartView",
+      "file": "frontend/src/router/index.ts",
+      "auth_required": false
     },
     {
-      "id": "items_item_id",
-      "summary": "Endpoint: /items/{item_id}",
-      "evidence": [
-        {
-          "path": "backend\\app\\routers\\cart.py"
-        }
-      ]
+      "path": "/login",
+      "name": "login",
+      "component": "LoginView",
+      "file": "frontend/src/router/index.ts",
+      "auth_required": false
     },
     {
-      "id": "slug",
-      "summary": "Endpoint: /{slug}",
-      "evidence": [
+      "path": "/register",
+      "name": "register",
+      "component": "RegisterView",
+      "file": "frontend/src/router/index.ts",
+      "auth_required": false
+    }
+  ],
+  "models": [
+    {
+      "name": "Cart",
+      "table": "carts",
+      "fields": [
         {
-          "path": "backend\\app\\routers\\categories.py"
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "user_id",
+          "type": "Integer",
+          "foreign_key": "users.id"
+        },
+        {
+          "name": "session_id",
+          "type": "String(255)"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime"
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime"
         }
-      ]
+      ],
+      "relationships": [
+        {
+          "name": "user",
+          "target": "User"
+        },
+        {
+          "name": "items",
+          "target": "CartItem"
+        }
+      ],
+      "file": "backend/app/models/cart.py"
     },
     {
-      "id": "order_id",
-      "summary": "Endpoint: /{order_id}",
-      "evidence": [
+      "name": "CartItem",
+      "table": "cart_items",
+      "fields": [
         {
-          "path": "backend\\app\\routers\\orders.py"
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "cart_id",
+          "type": "Integer",
+          "foreign_key": "carts.id"
+        },
+        {
+          "name": "product_id",
+          "type": "Integer",
+          "foreign_key": "products.id"
+        },
+        {
+          "name": "quantity",
+          "type": "Integer"
+        },
+        {
+          "name": "size",
+          "type": "String(20)"
+        },
+        {
+          "name": "color",
+          "type": "String(50)"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime"
         }
-      ]
+      ],
+      "relationships": [
+        {
+          "name": "cart",
+          "target": "Cart"
+        },
+        {
+          "name": "product",
+          "target": "Product"
+        }
+      ],
+      "file": "backend/app/models/cart.py"
     },
     {
-      "id": "new_arrivals",
-      "summary": "Endpoint: /new-arrivals",
-      "evidence": [
+      "name": "Order",
+      "table": "orders",
+      "fields": [
         {
-          "path": "backend\\app\\routers\\products.py"
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "user_id",
+          "type": "Integer",
+          "foreign_key": "users.id"
+        },
+        {
+          "name": "status",
+          "type": "String(50)"
+        },
+        {
+          "name": "subtotal",
+          "type": "Float"
+        },
+        {
+          "name": "discount",
+          "type": "Float"
+        },
+        {
+          "name": "delivery_fee",
+          "type": "Float"
+        },
+        {
+          "name": "total",
+          "type": "Float"
+        },
+        {
+          "name": "promo_code",
+          "type": "String(50)"
+        },
+        {
+          "name": "shipping_address",
+          "type": "JSON"
+        },
+        {
+          "name": "billing_address",
+          "type": "JSON"
+        },
+        {
+          "name": "notes",
+          "type": "Text"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime"
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime"
         }
-      ]
+      ],
+      "relationships": [
+        {
+          "name": "user",
+          "target": "User"
+        },
+        {
+          "name": "items",
+          "target": "OrderItem"
+        }
+      ],
+      "file": "backend/app/models/order.py"
     },
     {
-      "id": "top_selling",
-      "summary": "Endpoint: /top-selling",
-      "evidence": [
+      "name": "OrderItem",
+      "table": "order_items",
+      "fields": [
         {
-          "path": "backend\\app\\routers\\products.py"
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "order_id",
+          "type": "Integer",
+          "foreign_key": "orders.id"
+        },
+        {
+          "name": "product_id",
+          "type": "Integer",
+          "foreign_key": "products.id"
+        },
+        {
+          "name": "product_name",
+          "type": "String(255)"
+        },
+        {
+          "name": "product_image",
+          "type": "String(500)"
+        },
+        {
+          "name": "price",
+          "type": "Float"
+        },
+        {
+          "name": "quantity",
+          "type": "Integer"
+        },
+        {
+          "name": "size",
+          "type": "String(20)"
+        },
+        {
+          "name": "color",
+          "type": "String(50)"
         }
-      ]
+      ],
+      "relationships": [
+        {
+          "name": "order",
+          "target": "Order"
+        },
+        {
+          "name": "product",
+          "target": "Product"
+        }
+      ],
+      "file": "backend/app/models/order.py"
+    },
+    {
+      "name": "Category",
+      "table": "categories",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "name",
+          "type": "String(100)"
+        },
+        {
+          "name": "slug",
+          "type": "String(100)"
+        },
+        {
+          "name": "description",
+          "type": "Text"
+        },
+        {
+          "name": "image_url",
+          "type": "String(500)"
+        },
+        {
+          "name": "parent_id",
+          "type": "Integer",
+          "foreign_key": "categories.id"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime"
+        }
+      ],
+      "relationships": [
+        {
+          "name": "parent",
+          "target": "Category"
+        },
+        {
+          "name": "products",
+          "target": "Product"
+        }
+      ],
+      "file": "backend/app/models/product.py"
+    },
+    {
+      "name": "Product",
+      "table": "products",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "name",
+          "type": "String(255)"
+        },
+        {
+          "name": "slug",
+          "type": "String(255)"
+        },
+        {
+          "name": "description",
+          "type": "Text"
+        },
+        {
+          "name": "price",
+          "type": "Float"
+        },
+        {
+          "name": "discount_price",
+          "type": "Float"
+        },
+        {
+          "name": "discount_percent",
+          "type": "Integer"
+        },
+        {
+          "name": "category_id",
+          "type": "Integer",
+          "foreign_key": "categories.id"
+        },
+        {
+          "name": "sizes",
+          "type": "JSON"
+        },
+        {
+          "name": "colors",
+          "type": "JSON"
+        },
+        {
+          "name": "rating",
+          "type": "Float"
+        },
+        {
+          "name": "reviews_count",
+          "type": "Integer"
+        },
+        {
+          "name": "stock",
+          "type": "Integer"
+        },
+        {
+          "name": "is_new_arrival",
+          "type": "Integer"
+        },
+        {
+          "name": "is_top_selling",
+          "type": "Integer"
+        },
+        {
+          "name": "style",
+          "type": "String(100)"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime"
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime"
+        }
+      ],
+      "relationships": [
+        {
+          "name": "category",
+          "target": "Category"
+        },
+        {
+          "name": "images",
+          "target": "ProductImage"
+        }
+      ],
+      "file": "backend/app/models/product.py"
+    },
+    {
+      "name": "ProductImage",
+      "table": "product_images",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "product_id",
+          "type": "Integer",
+          "foreign_key": "products.id"
+        },
+        {
+          "name": "url",
+          "type": "String(500)"
+        },
+        {
+          "name": "is_primary",
+          "type": "Integer"
+        },
+        {
+          "name": "sort_order",
+          "type": "Integer"
+        }
+      ],
+      "relationships": [
+        {
+          "name": "product",
+          "target": "Product"
+        }
+      ],
+      "file": "backend/app/models/product.py"
+    },
+    {
+      "name": "User",
+      "table": "users",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer"
+        },
+        {
+          "name": "email",
+          "type": "String(255)"
+        },
+        {
+          "name": "hashed_password",
+          "type": "String(255)"
+        },
+        {
+          "name": "full_name",
+          "type": "String(255)"
+        },
+        {
+          "name": "is_active",
+          "type": "Boolean"
+        },
+        {
+          "name": "is_admin",
+          "type": "Boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime"
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime"
+        }
+      ],
+      "relationships": [
+        {
+          "name": "cart",
+          "target": "Cart"
+        },
+        {
+          "name": "orders",
+          "target": "Order"
+        }
+      ],
+      "file": "backend/app/models/user.py"
     }
   ],
   "runtime": {
@@ -241,16 +891,16 @@
         "version": "==0.109.0",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
       {
         "name": "uvicorn",
-        "version": "*",
+        "version": "==0.27.0",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
@@ -259,25 +909,25 @@
         "version": "==2.0.25",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
       {
         "name": "python-jose",
-        "version": "*",
+        "version": "==3.3.0",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
       {
         "name": "passlib",
-        "version": "*",
+        "version": "==1.7.4",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
@@ -286,16 +936,16 @@
         "version": "==0.0.6",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
       {
         "name": "pydantic",
-        "version": "*",
+        "version": "==2.5.3",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
@@ -304,7 +954,7 @@
         "version": "==2.1.0",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
@@ -313,7 +963,7 @@
         "version": "==0.19.0",
         "evidence": [
           {
-            "path": "backend\\requirements.txt"
+            "path": "backend/requirements.txt"
           }
         ]
       },
@@ -322,7 +972,7 @@
         "version": "^14.1.0",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -331,7 +981,7 @@
         "version": "^1.13.2",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -340,7 +990,7 @@
         "version": "^3.0.4",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -349,7 +999,7 @@
         "version": "^3.5.24",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -358,7 +1008,7 @@
         "version": "^4.6.4",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -367,7 +1017,7 @@
         "version": "^24.10.1",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -376,7 +1026,7 @@
         "version": "^6.0.1",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -385,7 +1035,7 @@
         "version": "^0.8.1",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -394,7 +1044,7 @@
         "version": "^10.4.23",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -403,7 +1053,7 @@
         "version": "^8.5.6",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -412,7 +1062,7 @@
         "version": "^3.4.19",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -421,7 +1071,7 @@
         "version": "~5.9.3",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -430,7 +1080,7 @@
         "version": "^7.2.4",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       },
@@ -439,21 +1089,21 @@
         "version": "^3.1.4",
         "evidence": [
           {
-            "path": "frontend\\package.json"
+            "path": "frontend/package.json"
           }
         ]
       }
     ],
     "build_files": [
-      "frontend\\package.json",
-      "frontend\\tsconfig.json",
-      "frontend\\vite.config.ts"
+      "frontend/package.json",
+      "frontend/tsconfig.json",
+      "frontend/vite.config.ts"
     ],
     "entrypoints": [
-      "backend\\app\\main.py",
-      "frontend\\src\\router\\index.ts",
-      "frontend\\src\\types\\index.ts",
-      "frontend\\src\\main.ts"
+      "backend/app/main.py",
+      "frontend/src/router/index.ts",
+      "frontend/src/types/index.ts",
+      "frontend/src/main.ts"
     ]
   }
 }
