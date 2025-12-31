@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -42,22 +43,20 @@ class Feature:
     evidence: list[Evidence] = field(default_factory=list)
 
 
+@dataclass
+class Dependency:
+    name: str
+    version: str
+    evidence: list[Evidence] = field(default_factory=list)
+
+
 class RepoAnalyzer:
     FACTS_SCHEMA = "facts.v1"
 
-    TEMPLATE_PATTERNS = [
-        "README-template*",
-        "TEMPLATE*",
-        ".github/ISSUE_TEMPLATE*",
-        ".github/PULL_REQUEST_TEMPLATE*",
-    ]
-
-    DEPENDENCY_FILES = {
-        "python": ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"],
-        "javascript": ["package.json", "package-lock.json", "yarn.lock"],
-        "go": ["go.mod", "go.sum"],
-        "java": ["pom.xml", "build.gradle"],
-        "rust": ["Cargo.toml"],
+    SKIP_DIRS = {
+        "node_modules", "vendor", ".git", "__pycache__", "venv", ".venv",
+        "env", "dist", "build", "eggs", ".eggs", ".tox", "htmlcov",
+        ".next", ".nuxt", "coverage", ".cache", ".pytest_cache"
     }
 
     EXTENSION_TO_LANG = {
@@ -78,6 +77,42 @@ class RepoAnalyzer:
         ".kt": "Kotlin",
     }
 
+    PYTHON_FRAMEWORKS = {
+        "django": ("Django", "web"),
+        "fastapi": ("FastAPI", "web"),
+        "flask": ("Flask", "web"),
+        "celery": ("Celery", "task-queue"),
+        "pytest": ("pytest", "testing"),
+        "sqlalchemy": ("SQLAlchemy", "orm"),
+        "pydantic": ("Pydantic", "validation"),
+        "alembic": ("Alembic", "migrations"),
+        "uvicorn": ("Uvicorn", "server"),
+        "gunicorn": ("Gunicorn", "server"),
+        "aiohttp": ("aiohttp", "web"),
+        "tornado": ("Tornado", "web"),
+        "starlette": ("Starlette", "web"),
+    }
+
+    JS_FRAMEWORKS = {
+        "react": ("React", "frontend"),
+        "vue": ("Vue.js", "frontend"),
+        "angular": ("Angular", "frontend"),
+        "svelte": ("Svelte", "frontend"),
+        "next": ("Next.js", "fullstack"),
+        "nuxt": ("Nuxt.js", "fullstack"),
+        "express": ("Express", "backend"),
+        "nestjs": ("NestJS", "backend"),
+        "fastify": ("Fastify", "backend"),
+        "koa": ("Koa", "backend"),
+        "hapi": ("Hapi", "backend"),
+        "tailwindcss": ("TailwindCSS", "styling"),
+        "redux": ("Redux", "state-management"),
+        "zustand": ("Zustand", "state-management"),
+        "prisma": ("Prisma", "orm"),
+        "typeorm": ("TypeORM", "orm"),
+        "mongoose": ("Mongoose", "odm"),
+    }
+
     ROLE_MAPPING = {
         "auth": "authentication",
         "users": "user-management",
@@ -91,6 +126,34 @@ class RepoAnalyzer:
         "models": "data-models",
         "utils": "utilities",
         "common": "shared-code",
+        "frontend": "frontend",
+        "backend": "backend",
+        "client": "frontend",
+        "server": "backend",
+        "web": "frontend",
+        "lib": "library",
+        "libs": "library",
+        "packages": "library",
+        "components": "ui-components",
+        "hooks": "react-hooks",
+        "pages": "pages",
+        "views": "views",
+        "routes": "routing",
+        "routers": "routing",
+        "controllers": "controllers",
+        "middlewares": "middleware",
+        "middleware": "middleware",
+        "schemas": "data-schemas",
+        "tests": "testing",
+        "test": "testing",
+        "config": "configuration",
+        "configs": "configuration",
+        "migrations": "migrations",
+        "static": "static-files",
+        "public": "static-files",
+        "assets": "assets",
+        "templates": "templates",
+        "docs": "documentation",
     }
 
     def __init__(self, repo_url: str, work_dir: str | None = None):
@@ -129,15 +192,29 @@ class RepoAnalyzer:
 
         return self.repo_path
 
+    def _should_skip_dir(self, path: str) -> bool:
+        parts = Path(path).parts
+        return any(part in self.SKIP_DIRS for part in parts)
+
+    def _find_files_recursive(self, filename: str) -> list[Path]:
+        if not self.repo_path:
+            return []
+
+        found = []
+        for root, dirs, files in os.walk(self.repo_path):
+            dirs[:] = [d for d in dirs if d not in self.SKIP_DIRS]
+            if filename in files:
+                found.append(Path(root) / filename)
+        return found
+
     def detect_languages(self) -> list[Language]:
         if not self.repo_path:
             raise RuntimeError("Repository not cloned")
 
         extension_counts: dict[str, int] = {}
 
-        for root, _, files in os.walk(self.repo_path):
-            if ".git" in root or "vendor" in root or "node_modules" in root:
-                continue
+        for root, dirs, files in os.walk(self.repo_path):
+            dirs[:] = [d for d in dirs if d not in self.SKIP_DIRS]
             for file in files:
                 ext = Path(file).suffix.lower()
                 if ext in self.EXTENSION_TO_LANG:
@@ -160,6 +237,66 @@ class RepoAnalyzer:
 
         return languages
 
+    def _parse_requirements_txt(self, path: Path) -> list[Dependency]:
+        deps = []
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+            for line in content.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or line.startswith("-"):
+                    continue
+
+                match = re.match(r'^([a-zA-Z0-9_-]+)\s*([<>=!~]+.+)?', line)
+                if match:
+                    name = match.group(1).lower()
+                    version = match.group(2) or "*"
+                    rel_path = str(path.relative_to(self.repo_path))
+                    deps.append(Dependency(name=name, version=version.strip(), evidence=[Evidence(path=rel_path)]))
+        except Exception:
+            pass
+        return deps
+
+    def _parse_package_json(self, path: Path) -> tuple[list[Dependency], dict]:
+        deps = []
+        package_data = {}
+        try:
+            content = path.read_text(encoding="utf-8")
+            package_data = json.loads(content)
+            rel_path = str(path.relative_to(self.repo_path))
+
+            for dep_type in ["dependencies", "devDependencies"]:
+                for name, version in package_data.get(dep_type, {}).items():
+                    deps.append(Dependency(name=name.lower(), version=version, evidence=[Evidence(path=rel_path)]))
+        except Exception:
+            pass
+        return deps, package_data
+
+    def _parse_pyproject_toml(self, path: Path) -> list[Dependency]:
+        deps = []
+        try:
+            content = path.read_text(encoding="utf-8")
+            rel_path = str(path.relative_to(self.repo_path))
+
+            in_deps = False
+            for line in content.splitlines():
+                if "[project.dependencies]" in line or "[tool.poetry.dependencies]" in line:
+                    in_deps = True
+                    continue
+                if in_deps and line.startswith("["):
+                    in_deps = False
+                if in_deps and "=" in line:
+                    match = re.match(r'^([a-zA-Z0-9_-]+)\s*=', line)
+                    if match:
+                        deps.append(Dependency(name=match.group(1).lower(), version="*", evidence=[Evidence(path=rel_path)]))
+
+                dep_match = re.findall(r'"([a-zA-Z0-9_-]+)(?:[<>=!~].+)?"', line)
+                for dep_name in dep_match:
+                    if dep_name.lower() not in [d.name for d in deps]:
+                        deps.append(Dependency(name=dep_name.lower(), version="*", evidence=[Evidence(path=rel_path)]))
+        except Exception:
+            pass
+        return deps
+
     def detect_frameworks(self) -> list[Framework]:
         if not self.repo_path:
             raise RuntimeError("Repository not cloned")
@@ -167,73 +304,61 @@ class RepoAnalyzer:
         frameworks = []
         found_frameworks = set()
 
-        python_frameworks = {
-            "django": ("Django", "web"),
-            "fastapi": ("FastAPI", "web"),
-            "flask": ("Flask", "web"),
-            "celery": ("Celery", "task-queue"),
-            "pytest": ("pytest", "testing"),
-            "sqlalchemy": ("SQLAlchemy", "orm"),
-            "pydantic": ("Pydantic", "validation"),
-        }
+        for req_path in self._find_files_recursive("requirements.txt"):
+            deps = self._parse_requirements_txt(req_path)
+            rel_path = str(req_path.relative_to(self.repo_path))
+            for dep in deps:
+                if dep.name in self.PYTHON_FRAMEWORKS and dep.name not in found_frameworks:
+                    name, fw_type = self.PYTHON_FRAMEWORKS[dep.name]
+                    frameworks.append(Framework(name=name, type=fw_type, evidence=[Evidence(path=rel_path)]))
+                    found_frameworks.add(dep.name)
 
-        js_frameworks = {
-            "react": ("React", "frontend"),
-            "vue": ("Vue.js", "frontend"),
-            "angular": ("Angular", "frontend"),
-            "next": ("Next.js", "fullstack"),
-            "nuxt": ("Nuxt.js", "fullstack"),
-            "express": ("Express", "backend"),
-            "nestjs": ("NestJS", "backend"),
-            "fastify": ("Fastify", "backend"),
-        }
+        for pyproject_path in self._find_files_recursive("pyproject.toml"):
+            content = pyproject_path.read_text(encoding="utf-8", errors="ignore").lower()
+            rel_path = str(pyproject_path.relative_to(self.repo_path))
+            for key, (name, fw_type) in self.PYTHON_FRAMEWORKS.items():
+                if key in content and key not in found_frameworks:
+                    frameworks.append(Framework(name=name, type=fw_type, evidence=[Evidence(path=rel_path)]))
+                    found_frameworks.add(key)
 
-        requirements_path = self.repo_path / "requirements.txt"
-        if requirements_path.exists():
-            content = requirements_path.read_text().lower()
-            for key, (name, fw_type) in python_frameworks.items():
-                if key in content and name not in found_frameworks:
-                    frameworks.append(Framework(
-                        name=name,
-                        type=fw_type,
-                        evidence=[Evidence(path="requirements.txt")]
-                    ))
-                    found_frameworks.add(name)
-
-        pyproject_path = self.repo_path / "pyproject.toml"
-        if pyproject_path.exists():
-            content = pyproject_path.read_text().lower()
-            for key, (name, fw_type) in python_frameworks.items():
-                if key in content and name not in found_frameworks:
-                    frameworks.append(Framework(
-                        name=name,
-                        type=fw_type,
-                        evidence=[Evidence(path="pyproject.toml")]
-                    ))
-                    found_frameworks.add(name)
-
-        package_json_path = self.repo_path / "package.json"
-        if package_json_path.exists():
-            try:
-                with open(package_json_path) as f:
-                    package_data = json.load(f)
-                deps = {
-                    **package_data.get("dependencies", {}),
-                    **package_data.get("devDependencies", {})
-                }
-                for key, (name, fw_type) in js_frameworks.items():
-                    if any(key in dep.lower() for dep in deps.keys()):
-                        if name not in found_frameworks:
-                            frameworks.append(Framework(
-                                name=name,
-                                type=fw_type,
-                                evidence=[Evidence(path="package.json")]
-                            ))
-                            found_frameworks.add(name)
-            except json.JSONDecodeError:
-                pass
+        for package_path in self._find_files_recursive("package.json"):
+            deps, _ = self._parse_package_json(package_path)
+            rel_path = str(package_path.relative_to(self.repo_path))
+            for dep in deps:
+                for key, (name, fw_type) in self.JS_FRAMEWORKS.items():
+                    if key in dep.name and key not in found_frameworks:
+                        frameworks.append(Framework(name=name, type=fw_type, evidence=[Evidence(path=rel_path)]))
+                        found_frameworks.add(key)
 
         return frameworks
+
+    def detect_dependencies(self) -> list[Dependency]:
+        if not self.repo_path:
+            raise RuntimeError("Repository not cloned")
+
+        all_deps = []
+        seen = set()
+
+        for req_path in self._find_files_recursive("requirements.txt"):
+            for dep in self._parse_requirements_txt(req_path):
+                if dep.name not in seen:
+                    all_deps.append(dep)
+                    seen.add(dep.name)
+
+        for pyproject_path in self._find_files_recursive("pyproject.toml"):
+            for dep in self._parse_pyproject_toml(pyproject_path):
+                if dep.name not in seen:
+                    all_deps.append(dep)
+                    seen.add(dep.name)
+
+        for package_path in self._find_files_recursive("package.json"):
+            deps, _ = self._parse_package_json(package_path)
+            for dep in deps:
+                if dep.name not in seen:
+                    all_deps.append(dep)
+                    seen.add(dep.name)
+
+        return all_deps
 
     def detect_architecture_type(self) -> dict[str, Any]:
         if not self.repo_path:
@@ -243,66 +368,99 @@ class RepoAnalyzer:
         layers = []
         evidence = []
 
-        web_indicators = ["routes", "controllers", "views", "api", "endpoints", "routers"]
-        for indicator in web_indicators:
-            indicator_path = self.repo_path / indicator
-            if indicator_path.exists():
-                arch_type = "web"
-                layers.append("api")
-                evidence.append(Evidence(path=indicator))
-                break
+        has_frontend = False
+        has_backend = False
 
-        for search_dir in [self.repo_path / "src", self.repo_path / "app", self.repo_path]:
-            if not search_dir.exists():
-                continue
-            for item in search_dir.iterdir():
-                if item.is_dir() and item.name in web_indicators:
+        frontend_dirs = {"frontend", "client", "web", "ui", "app"}
+        backend_dirs = {"backend", "server", "api"}
+
+        for item in self.repo_path.iterdir():
+            if item.is_dir():
+                name_lower = item.name.lower()
+                if name_lower in frontend_dirs:
+                    has_frontend = True
+                    layers.append("frontend")
+                    evidence.append(Evidence(path=item.name))
+                if name_lower in backend_dirs:
+                    has_backend = True
+                    layers.append("backend")
+                    evidence.append(Evidence(path=item.name))
+
+        if has_frontend and has_backend:
+            arch_type = "client-server"
+        elif has_frontend:
+            arch_type = "web"
+            layers.append("frontend")
+        elif has_backend:
+            arch_type = "api"
+            layers.append("backend")
+
+        frameworks = self.detect_frameworks()
+        for fw in frameworks:
+            if fw.type == "fullstack":
+                arch_type = "fullstack"
+                if "frontend" not in layers:
+                    layers.append("frontend")
+                if "backend" not in layers:
+                    layers.append("backend")
+            elif fw.type == "frontend" and "frontend" not in layers:
+                layers.append("frontend")
+                if arch_type == "unknown":
                     arch_type = "web"
-                    layers.append("api")
-                    evidence.append(Evidence(path=str(item.relative_to(self.repo_path))))
-                    break
-
-        app_path = self.repo_path / "app"
-        if app_path.exists() and app_path.is_dir():
-            if arch_type == "unknown":
-                arch_type = "web"
-            layers.append("domain")
-
-        desktop_extensions = [".ui", ".qml", ".xib", ".xaml"]
-        for root, _, files in os.walk(self.repo_path):
-            if ".git" in root:
-                continue
-            for file in files:
-                if any(file.endswith(ext) for ext in desktop_extensions):
-                    arch_type = "desktop"
-                    evidence.append(Evidence(path=file))
-                    break
-            if arch_type == "desktop":
-                break
+            elif fw.type in ("web", "backend") and "backend" not in layers:
+                layers.append("backend")
+                if arch_type == "unknown":
+                    arch_type = "api"
 
         if arch_type == "unknown":
-            cli_indicators = ["cli.py", "main.py", "cmd", "__main__.py"]
+            web_indicators = ["routes", "controllers", "views", "api", "endpoints", "routers"]
+            for indicator in web_indicators:
+                for found in self._find_files_recursive(indicator):
+                    if found.is_dir():
+                        arch_type = "web"
+                        layers.append("api")
+                        evidence.append(Evidence(path=str(found.relative_to(self.repo_path))))
+                        break
+
+        if arch_type == "unknown":
+            desktop_extensions = [".ui", ".qml", ".xib", ".xaml"]
+            for root, dirs, files in os.walk(self.repo_path):
+                dirs[:] = [d for d in dirs if d not in self.SKIP_DIRS]
+                for file in files:
+                    if any(file.endswith(ext) for ext in desktop_extensions):
+                        arch_type = "desktop"
+                        evidence.append(Evidence(path=file))
+                        break
+                if arch_type == "desktop":
+                    break
+
+        if arch_type == "unknown":
+            pyproject_files = self._find_files_recursive("pyproject.toml")
+            setup_files = self._find_files_recursive("setup.py")
+            if pyproject_files or setup_files:
+                for pp in pyproject_files:
+                    content = pp.read_text(encoding="utf-8", errors="ignore")
+                    if "[project]" in content or "[tool.poetry]" in content:
+                        if "console_scripts" not in content and "gui_scripts" not in content:
+                            arch_type = "library"
+                            evidence.append(Evidence(path=str(pp.relative_to(self.repo_path))))
+
+        if arch_type == "unknown":
+            cli_indicators = ["cli.py", "__main__.py"]
             for indicator in cli_indicators:
-                if (self.repo_path / indicator).exists():
+                found = self._find_files_recursive(indicator)
+                if found:
                     arch_type = "cli"
-                    evidence.append(Evidence(path=indicator))
+                    evidence.append(Evidence(path=str(found[0].relative_to(self.repo_path))))
                     break
 
-        if arch_type == "unknown":
-            src_main = self.repo_path / "src" / "__main__.py"
-            if src_main.exists():
-                arch_type = "cli"
-                evidence.append(Evidence(path="src/__main__.py"))
-
-        if (self.repo_path / "Dockerfile").exists():
+        for dockerfile in self._find_files_recursive("Dockerfile"):
             layers.append("infra")
-            evidence.append(Evidence(path="Dockerfile"))
+            evidence.append(Evidence(path=str(dockerfile.relative_to(self.repo_path))))
 
-        if (self.repo_path / "docker-compose.yml").exists():
-            evidence.append(Evidence(path="docker-compose.yml"))
-
-        if (self.repo_path / "docker-compose.yaml").exists():
-            evidence.append(Evidence(path="docker-compose.yaml"))
+        for compose in ["docker-compose.yml", "docker-compose.yaml"]:
+            for found in self._find_files_recursive(compose):
+                evidence.append(Evidence(path=str(found.relative_to(self.repo_path))))
 
         return {
             "type": arch_type,
@@ -323,9 +481,6 @@ class RepoAnalyzer:
             self.repo_path,
         ]
 
-        skip_dirs = {"node_modules", "vendor", ".git", "__pycache__", "venv", ".venv",
-                     "env", "dist", "build", "eggs", ".eggs", ".tox", "htmlcov"}
-
         for search_dir in search_dirs:
             if not search_dir.exists():
                 continue
@@ -335,7 +490,7 @@ class RepoAnalyzer:
                     continue
                 if item.name.startswith((".", "_")):
                     continue
-                if item.name in skip_dirs:
+                if item.name in self.SKIP_DIRS:
                     continue
                 if item.name in found_modules:
                     continue
@@ -350,6 +505,57 @@ class RepoAnalyzer:
 
         return modules
 
+    def extract_features(self) -> list[Feature]:
+        if not self.repo_path:
+            raise RuntimeError("Repository not cloned")
+
+        features = []
+        seen_features = set()
+
+        route_patterns = [
+            (r'@app\.(?:get|post|put|delete|patch)\s*\(\s*["\']([^"\']+)["\']', "FastAPI/Flask route"),
+            (r'@router\.(?:get|post|put|delete|patch)\s*\(\s*["\']([^"\']+)["\']', "FastAPI router"),
+            (r'path\s*\(\s*["\']([^"\']+)["\']', "Django path"),
+            (r'url\s*\(\s*r?["\']([^"\']+)["\']', "Django url"),
+            (r'app\.(?:get|post|put|delete|patch)\s*\(\s*["\']([^"\']+)["\']', "Express route"),
+            (r'router\.(?:get|post|put|delete|patch)\s*\(\s*["\']([^"\']+)["\']', "Express router"),
+            (r'@(?:Get|Post|Put|Delete|Patch)\s*\(\s*["\']([^"\']+)["\']', "NestJS route"),
+        ]
+
+        for root, dirs, files in os.walk(self.repo_path):
+            dirs[:] = [d for d in dirs if d not in self.SKIP_DIRS]
+
+            for file in files:
+                if not file.endswith((".py", ".js", ".ts")):
+                    continue
+
+                file_path = Path(root) / file
+                try:
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+
+                for pattern, route_type in route_patterns:
+                    matches = re.findall(pattern, content)
+                    for match in matches:
+                        route = match.strip()
+                        if route and route not in seen_features:
+                            feature_id = self._route_to_feature_id(route)
+                            rel_path = str(file_path.relative_to(self.repo_path))
+                            features.append(Feature(
+                                id=feature_id,
+                                summary=f"Endpoint: {route}",
+                                evidence=[Evidence(path=rel_path)]
+                            ))
+                            seen_features.add(route)
+
+        return features
+
+    def _route_to_feature_id(self, route: str) -> str:
+        clean = re.sub(r'[{}<>:*?]', '', route)
+        clean = clean.strip('/').replace('/', '_').replace('-', '_')
+        return clean or "root"
+
     def _find_build_files(self) -> list[str]:
         if not self.repo_path:
             return []
@@ -358,12 +564,17 @@ class RepoAnalyzer:
         candidates = [
             "Dockerfile", "docker-compose.yml", "docker-compose.yaml",
             "Makefile", "setup.py", "pyproject.toml", "setup.cfg",
-            "tox.ini", "noxfile.py", "justfile"
+            "tox.ini", "noxfile.py", "justfile", "package.json",
+            "tsconfig.json", "webpack.config.js", "vite.config.js",
+            "vite.config.ts", "next.config.js", "nuxt.config.js"
         ]
 
         for candidate in candidates:
-            if (self.repo_path / candidate).exists():
-                build_files.append(candidate)
+            found = self._find_files_recursive(candidate)
+            for f in found:
+                rel_path = str(f.relative_to(self.repo_path))
+                if rel_path not in build_files:
+                    build_files.append(rel_path)
 
         return build_files
 
@@ -374,23 +585,16 @@ class RepoAnalyzer:
         entrypoints = []
         candidates = [
             "main.py", "app.py", "manage.py", "wsgi.py", "asgi.py",
-            "index.js", "app.js", "server.js", "main.go", "main.rs"
+            "index.js", "app.js", "server.js", "main.go", "main.rs",
+            "index.ts", "main.ts", "__main__.py"
         ]
 
         for candidate in candidates:
-            if (self.repo_path / candidate).exists():
-                entrypoints.append(candidate)
-
-        nested_candidates = [
-            ("app", "main.py"),
-            ("src", "main.py"),
-            ("src", "__main__.py"),
-        ]
-
-        for parent, child in nested_candidates:
-            path = self.repo_path / parent / child
-            if path.exists():
-                entrypoints.append(f"{parent}/{child}")
+            found = self._find_files_recursive(candidate)
+            for f in found:
+                rel_path = str(f.relative_to(self.repo_path))
+                if rel_path not in entrypoints:
+                    entrypoints.append(rel_path)
 
         return entrypoints
 
@@ -399,6 +603,8 @@ class RepoAnalyzer:
         frameworks = self.detect_frameworks()
         architecture = self.detect_architecture_type()
         modules = self.extract_modules()
+        features = self.extract_features()
+        dependencies = self.detect_dependencies()
 
         return {
             "schema": self.FACTS_SCHEMA,
@@ -432,9 +638,23 @@ class RepoAnalyzer:
                 }
                 for mod in modules
             ],
-            "features": [],
+            "features": [
+                {
+                    "id": feat.id,
+                    "summary": feat.summary,
+                    "evidence": [{"path": e.path} for e in feat.evidence]
+                }
+                for feat in features
+            ],
             "runtime": {
-                "dependencies": [],
+                "dependencies": [
+                    {
+                        "name": dep.name,
+                        "version": dep.version,
+                        "evidence": [{"path": e.path} for e in dep.evidence]
+                    }
+                    for dep in dependencies
+                ],
                 "build_files": self._find_build_files(),
                 "entrypoints": self._find_entrypoints()
             }
