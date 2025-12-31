@@ -1,0 +1,459 @@
+{
+  "schema": "facts.v1",
+  "repo": {
+    "url": "https://github.com/HubMan17/shop-co-ecommerce",
+    "commit": "6e82108f552adacc66cf2c89cd39664c0843ee39",
+    "detected_at": "2025-12-31T15:18:55.859708Z"
+  },
+  "languages": [
+    {
+      "name": "Python",
+      "ratio": 0.71,
+      "evidence": [
+        {
+          "path": "*.py"
+        }
+      ]
+    },
+    {
+      "name": "TypeScript",
+      "ratio": 0.23,
+      "evidence": [
+        {
+          "path": "*.ts"
+        },
+        {
+          "path": "*.tsx"
+        }
+      ]
+    },
+    {
+      "name": "JavaScript",
+      "ratio": 0.06,
+      "evidence": [
+        {
+          "path": "*.js"
+        },
+        {
+          "path": "*.jsx"
+        }
+      ]
+    }
+  ],
+  "frameworks": [
+    {
+      "name": "FastAPI",
+      "type": "web",
+      "evidence": [
+        {
+          "path": "backend\\requirements.txt"
+        }
+      ]
+    },
+    {
+      "name": "Uvicorn",
+      "type": "server",
+      "evidence": [
+        {
+          "path": "backend\\requirements.txt"
+        }
+      ]
+    },
+    {
+      "name": "SQLAlchemy",
+      "type": "orm",
+      "evidence": [
+        {
+          "path": "backend\\requirements.txt"
+        }
+      ]
+    },
+    {
+      "name": "Pydantic",
+      "type": "validation",
+      "evidence": [
+        {
+          "path": "backend\\requirements.txt"
+        }
+      ]
+    },
+    {
+      "name": "Vue.js",
+      "type": "frontend",
+      "evidence": [
+        {
+          "path": "frontend\\package.json"
+        }
+      ]
+    },
+    {
+      "name": "TailwindCSS",
+      "type": "styling",
+      "evidence": [
+        {
+          "path": "frontend\\package.json"
+        }
+      ]
+    }
+  ],
+  "architecture": {
+    "type": "client-server",
+    "layers": [
+      "frontend",
+      "backend"
+    ],
+    "evidence": [
+      {
+        "path": "backend",
+        "lines": []
+      },
+      {
+        "path": "frontend",
+        "lines": []
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "backend",
+      "role": "backend",
+      "evidence": [
+        {
+          "path": "backend"
+        }
+      ]
+    },
+    {
+      "name": "frontend",
+      "role": "frontend",
+      "evidence": [
+        {
+          "path": "frontend"
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "root",
+      "summary": "Endpoint: /",
+      "evidence": [
+        {
+          "path": "backend\\app\\main.py"
+        }
+      ]
+    },
+    {
+      "id": "api_health",
+      "summary": "Endpoint: /api/health",
+      "evidence": [
+        {
+          "path": "backend\\app\\main.py"
+        }
+      ]
+    },
+    {
+      "id": "register",
+      "summary": "Endpoint: /register",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\auth.py"
+        }
+      ]
+    },
+    {
+      "id": "login",
+      "summary": "Endpoint: /login",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\auth.py"
+        }
+      ]
+    },
+    {
+      "id": "me",
+      "summary": "Endpoint: /me",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\auth.py"
+        }
+      ]
+    },
+    {
+      "id": "items",
+      "summary": "Endpoint: /items",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\cart.py"
+        }
+      ]
+    },
+    {
+      "id": "items_item_id",
+      "summary": "Endpoint: /items/{item_id}",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\cart.py"
+        }
+      ]
+    },
+    {
+      "id": "slug",
+      "summary": "Endpoint: /{slug}",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\categories.py"
+        }
+      ]
+    },
+    {
+      "id": "order_id",
+      "summary": "Endpoint: /{order_id}",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\orders.py"
+        }
+      ]
+    },
+    {
+      "id": "new_arrivals",
+      "summary": "Endpoint: /new-arrivals",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\products.py"
+        }
+      ]
+    },
+    {
+      "id": "top_selling",
+      "summary": "Endpoint: /top-selling",
+      "evidence": [
+        {
+          "path": "backend\\app\\routers\\products.py"
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "dependencies": [
+      {
+        "name": "fastapi",
+        "version": "==0.109.0",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "uvicorn",
+        "version": "*",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "sqlalchemy",
+        "version": "==2.0.25",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "python-jose",
+        "version": "*",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "passlib",
+        "version": "*",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "python-multipart",
+        "version": "==0.0.6",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "pydantic",
+        "version": "*",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "pydantic-settings",
+        "version": "==2.1.0",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "aiosqlite",
+        "version": "==0.19.0",
+        "evidence": [
+          {
+            "path": "backend\\requirements.txt"
+          }
+        ]
+      },
+      {
+        "name": "@vueuse/core",
+        "version": "^14.1.0",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "axios",
+        "version": "^1.13.2",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "pinia",
+        "version": "^3.0.4",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "vue",
+        "version": "^3.5.24",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "vue-router",
+        "version": "^4.6.4",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "@types/node",
+        "version": "^24.10.1",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "@vitejs/plugin-vue",
+        "version": "^6.0.1",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "@vue/tsconfig",
+        "version": "^0.8.1",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "autoprefixer",
+        "version": "^10.4.23",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "postcss",
+        "version": "^8.5.6",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "tailwindcss",
+        "version": "^3.4.19",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "typescript",
+        "version": "~5.9.3",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "vite",
+        "version": "^7.2.4",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      },
+      {
+        "name": "vue-tsc",
+        "version": "^3.1.4",
+        "evidence": [
+          {
+            "path": "frontend\\package.json"
+          }
+        ]
+      }
+    ],
+    "build_files": [
+      "frontend\\package.json",
+      "frontend\\tsconfig.json",
+      "frontend\\vite.config.ts"
+    ],
+    "entrypoints": [
+      "backend\\app\\main.py",
+      "frontend\\src\\router\\index.ts",
+      "frontend\\src\\types\\index.ts",
+      "frontend\\src\\main.ts"
+    ]
+  }
+}
