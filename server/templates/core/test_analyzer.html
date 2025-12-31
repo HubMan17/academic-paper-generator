@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repository Analyzer - Test Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">Repository Analyzer</h1>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <form id="analyzeForm" class="space-y-4">
+                <div>
+                    <label for="repoUrl" class="block text-sm font-medium text-gray-700 mb-2">
+                        URL репозитория
+                    </label>
+                    <input
+                        type="url"
+                        id="repoUrl"
+                        name="repo_url"
+                        placeholder="https://github.com/username/repository"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                    >
+                </div>
+                <button
+                    type="submit"
+                    id="submitBtn"
+                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                >
+                    Анализировать
+                </button>
+            </form>
+        </div>
+
+        <div id="loading" class="hidden bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-center space-x-2">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span class="text-gray-600">Анализируем репозиторий...</span>
+            </div>
+        </div>
+
+        <div id="error" class="hidden bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+            <h3 class="text-red-800 font-semibold mb-2">Ошибка</h3>
+            <p id="errorMessage" class="text-red-600"></p>
+        </div>
+
+        <div id="results" class="hidden space-y-6">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Результаты анализа</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-blue-800 mb-1">Языки</h3>
+                        <p id="languagesCount" class="text-2xl font-bold text-blue-600">0</p>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-green-800 mb-1">Фреймворки</h3>
+                        <p id="frameworksCount" class="text-2xl font-bold text-green-600">0</p>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-purple-800 mb-1">Архитектура</h3>
+                        <p id="architectureType" class="text-lg font-bold text-purple-600">-</p>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-gray-700 mb-2">Языки программирования</h3>
+                    <div id="languagesList" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-gray-700 mb-2">Фреймворки</h3>
+                    <div id="frameworksList" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-gray-700 mb-2">API Endpoints</h3>
+                    <p id="endpointsInfo" class="text-gray-600"></p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">facts.json</h2>
+                    <button
+                        id="downloadBtn"
+                        class="bg-gray-600 text-white py-1 px-3 rounded hover:bg-gray-700 transition-colors text-sm"
+                    >
+                        Скачать JSON
+                    </button>
+                </div>
+                <details class="cursor-pointer">
+                    <summary class="text-blue-600 hover:text-blue-800 mb-2">Показать/скрыть JSON</summary>
+                    <pre id="jsonOutput" class="bg-gray-50 p-4 rounded-lg overflow-x-auto text-sm max-h-96 overflow-y-auto"></pre>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let factsData = null;
+
+        document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const repoUrl = document.getElementById('repoUrl').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const results = document.getElementById('results');
+
+            submitBtn.disabled = true;
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/v1/analyzer/analyze/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ repo_url: repoUrl }),
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    factsData = data.facts;
+                    displayResults(data.facts);
+                    results.classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Неизвестная ошибка');
+                }
+            } catch (err) {
+                document.getElementById('errorMessage').textContent = err.message;
+                error.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        });
+
+        function displayResults(facts) {
+            document.getElementById('languagesCount').textContent = facts.languages?.length || 0;
+            document.getElementById('frameworksCount').textContent = facts.frameworks?.length || 0;
+            document.getElementById('architectureType').textContent = facts.architecture?.type || '-';
+
+            const languagesList = document.getElementById('languagesList');
+            languagesList.innerHTML = '';
+            (facts.languages || []).forEach(lang => {
+                const badge = document.createElement('span');
+                badge.className = 'bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm';
+                badge.textContent = `${lang.name} (${Math.round(lang.ratio * 100)}%)`;
+                languagesList.appendChild(badge);
+            });
+
+            const frameworksList = document.getElementById('frameworksList');
+            frameworksList.innerHTML = '';
+            (facts.frameworks || []).forEach(fw => {
+                const badge = document.createElement('span');
+                badge.className = 'bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm';
+                badge.textContent = `${fw.name} (${fw.type})`;
+                frameworksList.appendChild(badge);
+            });
+
+            const endpointsCount = facts.api?.total_count || 0;
+            document.getElementById('endpointsInfo').textContent =
+                endpointsCount > 0 ? `Найдено ${endpointsCount} endpoint(s)` : 'API endpoints не найдены';
+
+            document.getElementById('jsonOutput').textContent = JSON.stringify(facts, null, 2);
+        }
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            if (!factsData) return;
+
+            const blob = new Blob([JSON.stringify(factsData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'facts.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
