@@ -50,7 +50,7 @@ class OpenAIProvider:
             "timeout": self._timeout,
         }
 
-        if max_tokens:
+        if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
 
         if response_format:

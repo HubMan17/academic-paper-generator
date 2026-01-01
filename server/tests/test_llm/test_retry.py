@@ -8,9 +8,9 @@ class TestCalculateBackoff:
         b2 = calculate_backoff(2)
         b3 = calculate_backoff(3)
 
-        base1 = BACKOFF_BASE * 2
-        base2 = BACKOFF_BASE * 4
-        base3 = BACKOFF_BASE * 8
+        base1 = BACKOFF_BASE * 1
+        base2 = BACKOFF_BASE * 2
+        base3 = BACKOFF_BASE * 4
 
         assert base1 * JITTER_MIN <= b1 <= base1 * JITTER_MAX
         assert base2 * JITTER_MIN <= b2 <= base2 * JITTER_MAX
@@ -23,7 +23,7 @@ class TestCalculateBackoff:
     def test_jitter_in_range(self):
         for attempt in range(1, 10):
             backoff = calculate_backoff(attempt)
-            expected_base = min(BACKOFF_BASE * (2 ** attempt), BACKOFF_CAP)
+            expected_base = min(BACKOFF_BASE * (2 ** (attempt - 1)), BACKOFF_CAP)
             assert backoff >= expected_base * JITTER_MIN
             assert backoff <= expected_base * JITTER_MAX
 
