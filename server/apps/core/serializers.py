@@ -26,6 +26,7 @@ class LLMTextRequestSerializer(serializers.Serializer):
     model = serializers.CharField(
         required=False,
         default=None,
+        allow_null=True,
         help_text="Модель (по умолчанию gpt-4o-mini)"
     )
     temperature = serializers.FloatField(
@@ -43,10 +44,10 @@ class LLMTextRequestSerializer(serializers.Serializer):
 class LLMJsonRequestSerializer(serializers.Serializer):
     system = serializers.CharField(required=True)
     user = serializers.CharField(required=True)
-    model = serializers.CharField(required=False, default=None)
+    model = serializers.CharField(required=False, default=None, allow_null=True)
     temperature = serializers.FloatField(required=False, default=0.3)
     use_cache = serializers.BooleanField(required=False, default=True)
-    schema = serializers.DictField(required=False, default=None)
+    schema = serializers.DictField(required=False, default=None, allow_null=True)
 
 
 class LLMResponseSerializer(serializers.Serializer):
