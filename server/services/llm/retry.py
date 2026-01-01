@@ -8,7 +8,7 @@ JITTER_MAX = 1.2
 
 
 def calculate_backoff(attempt: int) -> float:
-    delay = min(BACKOFF_BASE * (2 ** attempt), BACKOFF_CAP)
+    delay = min(BACKOFF_BASE * (2 ** (attempt - 1)), BACKOFF_CAP)
     jitter = random.uniform(JITTER_MIN, JITTER_MAX)
     return delay * jitter
 

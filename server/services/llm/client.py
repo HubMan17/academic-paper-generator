@@ -22,9 +22,7 @@ from .errors import (
     LLMSchemaValidationError,
     LLMConfigError,
 )
-from .pricing import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_S
-
-LOCK_POLL_INTERVAL = 0.5
+from .pricing import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_S, DEFAULT_LOCK_POLL_INTERVAL
 
 
 class LLMClient:
@@ -210,7 +208,8 @@ class LLMClient:
                     return record
             except LLMCall.DoesNotExist:
                 return None
-            time.sleep(LOCK_POLL_INTERVAL)
+            poll_interval = getattr(settings, 'LLM_LOCK_POLL_INTERVAL', DEFAULT_LOCK_POLL_INTERVAL)
+            time.sleep(poll_interval)
 
         return None
 
