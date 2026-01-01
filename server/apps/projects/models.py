@@ -142,26 +142,16 @@ class Document(models.Model):
 
 
 class Section(models.Model):
-    class Key(models.TextChoices):
-        OUTLINE = 'outline', 'Outline'
-        THEORY = 'theory', 'Theory'
-        PRACTICE = 'practice', 'Practice'
-        CONCLUSION = 'conclusion', 'Conclusion'
-
     class Status(models.TextChoices):
         IDLE = 'idle', 'Idle'
         QUEUED = 'queued', 'Queued'
         RUNNING = 'running', 'Running'
         SUCCESS = 'success', 'Success'
         FAILED = 'failed', 'Failed'
-        PENDING = 'pending', 'Pending'
-        GENERATING = 'generating', 'Generating'
-        READY = 'ready', 'Ready'
-        ERROR = 'error', 'Error'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='sections')
-    key = models.CharField(max_length=20, choices=Key.choices)
+    key = models.CharField(max_length=50)
     title = models.CharField(max_length=200, blank=True)
     order = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.IDLE)
