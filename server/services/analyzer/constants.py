@@ -1,3 +1,4 @@
+ANALYZER_VERSION = "v1"
 FACTS_SCHEMA = "facts.v1"
 
 SKIP_DIRS = {

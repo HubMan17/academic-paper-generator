@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'apps.core',
     'apps.accounts',
     'apps.projects',
+    'apps.llm',
 ]
 
 MIDDLEWARE = [
@@ -116,3 +117,9 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_MODEL_DEFAULT = os.getenv('OPENAI_MODEL_DEFAULT', 'gpt-4o-mini')
+LLM_TIMEOUT_S = int(os.getenv('LLM_TIMEOUT_S', '60'))
+LLM_MAX_RETRIES = int(os.getenv('LLM_MAX_RETRIES', '3'))
+LLM_MAX_CHARS_TOTAL = int(os.getenv('LLM_MAX_CHARS_TOTAL', '100000'))
