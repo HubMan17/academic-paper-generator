@@ -85,8 +85,10 @@ class Artifact(models.Model):
 class DocumentArtifact(models.Model):
     class Kind(models.TextChoices):
         OUTLINE = 'outline', 'Outline JSON'
+        DOCUMENT_PROFILE = 'document_profile', 'Document Profile'
         SECTION_TEXT = 'section_text', 'Section Text'
         SECTION_SUMMARY = 'section_summary', 'Section Summary'
+        SECTION_ENRICHED = 'section_enriched', 'Section Enriched'
         CONTEXT_PACK = 'context_pack', 'Context Pack'
         TRACE = 'trace', 'Generation Trace'
         LLM_TRACE = 'llm_trace', 'LLM Call Trace'
@@ -99,6 +101,9 @@ class DocumentArtifact(models.Model):
         TRANSITIONS = 'transitions', 'Transitions'
         SECTION_EDITED = 'section_edited', 'Section Edited'
         DOCUMENT_EDITED = 'document_edited', 'Document Edited'
+        DOCUMENT_DRAFT = 'document_draft', 'Document Draft'
+        TOC = 'toc', 'Table of Contents'
+        LITERATURE = 'literature', 'Literature List'
 
     class Format(models.TextChoices):
         JSON = 'json', 'JSON'
@@ -132,8 +137,34 @@ class DocumentArtifact(models.Model):
         return f"DocumentArtifact {self.kind} for {self.document_id}"
 
 
+class DocumentProfile(models.Model):
+    class WorkType(models.TextChoices):
+        REFERAT = 'referat', 'Реферат'
+        DIPLOMA = 'diploma', 'Диплом'
+        COURSE = 'course', 'Курсовая'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    work_type = models.CharField(max_length=20, choices=WorkType.choices, default=WorkType.COURSE)
+    topic_title = models.CharField(max_length=500)
+    topic_description = models.TextField(blank=True)
+    language = models.CharField(max_length=10, default='ru')
+    target_pages_min = models.IntegerField(default=20)
+    target_pages_max = models.IntegerField(default=40)
+    style_level = models.IntegerField(default=1)
+    constraints = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'document_profiles'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.get_work_type_display()}: {self.topic_title[:50]}"
+
+
 class Document(models.Model):
     class Type(models.TextChoices):
+        REFERAT = 'referat', 'Referat'
         COURSE = 'course', 'Course Work'
         DIPLOMA = 'diploma', 'Diploma'
 
@@ -141,12 +172,27 @@ class Document(models.Model):
         DRAFT = 'draft', 'Draft'
         GENERATING = 'generating', 'Generating'
         READY = 'ready', 'Ready'
+        ENRICHING = 'enriching', 'Enriching'
         EDITING = 'editing', 'Editing'
         FINALIZED = 'finalized', 'Finalized'
         ERROR = 'error', 'Error'
 
+    class Stage(models.TextChoices):
+        OUTLINE = 'outline', 'Outline'
+        GENERATION = 'generation', 'Generation'
+        ENRICHMENT = 'enrichment', 'Enrichment'
+        EDITING = 'editing', 'Editing'
+        FINALIZATION = 'finalization', 'Finalization'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     analysis_run = models.ForeignKey(AnalysisRun, on_delete=models.CASCADE, related_name='documents')
+    profile = models.ForeignKey(
+        'DocumentProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='documents'
+    )
     type = models.CharField(max_length=20, choices=Type.choices, default=Type.COURSE)
     language = models.CharField(max_length=10, default='ru-RU')
     target_pages = models.IntegerField(default=40)
@@ -159,6 +205,7 @@ class Document(models.Model):
         related_name='as_current_outline_for_documents'
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    current_stage = models.CharField(max_length=20, choices=Stage.choices, default=Stage.OUTLINE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -182,9 +229,13 @@ class Section(models.Model):
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='sections')
     key = models.CharField(max_length=50)
     title = models.CharField(max_length=200, blank=True)
+    chapter_key = models.CharField(max_length=50, blank=True, default='')
+    depth = models.IntegerField(default=1)
     order = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.IDLE)
     text_current = models.TextField(blank=True)
+    enriched_text = models.TextField(blank=True)
+    edited_text = models.TextField(blank=True)
     summary_current = models.TextField(blank=True)
     version = models.IntegerField(default=0)
     last_artifact = models.ForeignKey(

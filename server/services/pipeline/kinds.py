@@ -3,13 +3,17 @@ from enum import Enum
 
 class ArtifactKind(str, Enum):
     OUTLINE = "outline:v1"
+    OUTLINE_V2 = "outline:v2"
+    DOCUMENT_PROFILE = "document_profile:v1"
     CONTEXT_PACK = "context_pack:{key}:v1"
     SECTION = "section:{key}:v1"
     SECTION_SUMMARY = "section_summary:{key}:v1"
+    SECTION_ENRICHED = "section_enriched:{key}:v1"
     LLM_TRACE = "llm_trace:{key}:v1"
     DOCUMENT_DRAFT = "document_draft:v1"
     TOC = "toc:v1"
     QUALITY_REPORT = "quality_report:v1"
+    LITERATURE = "literature:v1"
 
     @classmethod
     def context_pack(cls, key: str) -> str:
@@ -22,6 +26,10 @@ class ArtifactKind(str, Enum):
     @classmethod
     def section_summary(cls, key: str) -> str:
         return cls.SECTION_SUMMARY.value.replace("{key}", key)
+
+    @classmethod
+    def section_enriched(cls, key: str) -> str:
+        return cls.SECTION_ENRICHED.value.replace("{key}", key)
 
     @classmethod
     def llm_trace(cls, key: str) -> str:

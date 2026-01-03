@@ -11,12 +11,14 @@ from services.pipeline.profiles import get_profile
 from services.pipeline.specs import get_all_section_keys, get_section_spec
 from services.pipeline.steps import (
     ensure_outline,
+    ensure_outline_v2,
     ensure_context_pack,
     ensure_section,
     ensure_section_summary,
     ensure_document_draft,
     ensure_toc,
     ensure_quality_report,
+    ensure_enrichment,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,11 +92,13 @@ class DocumentRunner:
                 progress = 10 + int(((i + 1) / section_count) * 75)
                 self._report_progress(progress, f"Section {key} completed")
 
-            self._report_progress(85, "Assembling document")
+            self._report_progress(82, "Running enrichment")
+            self._run_enrichment(job_id, force)
+            self._report_progress(87, "Assembling document")
             self._run_assemble(job_id, force)
-            self._report_progress(90, "Generating TOC")
+            self._report_progress(92, "Generating TOC")
             self._run_toc(job_id, force)
-            self._report_progress(95, "Running quality checks")
+            self._report_progress(97, "Running quality checks")
 
             duration_ms = int((time.time() - start_time) * 1000)
             self._run_quality(job_id, force, duration_ms)
@@ -345,5 +349,17 @@ class DocumentRunner:
             force=force,
             job_id=job_id,
             start_time_ms=start_time_ms,
+        )
+        self._track_artifact(kind, was_cached=(existing is not None and not force))
+
+    def _run_enrichment(self, job_id: UUID | None, force: bool):
+        kind = "enrichment_report:v1"
+        existing = get_success_artifact(self.document_id, kind)
+
+        ensure_enrichment(
+            document_id=self.document_id,
+            force=force,
+            job_id=job_id,
+            mock_mode=self.mock_mode,
         )
         self._track_artifact(kind, was_cached=(existing is not None and not force))

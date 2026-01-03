@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from services.prompting.schema import SectionSpec as PromptingSectionSpec, OutlineMode
+from services.pipeline.work_types import get_work_type_preset, WorkTypePreset
 
 
 @dataclass
@@ -16,6 +17,8 @@ class PipelineSectionSpec:
     key: str
     title: str
     order: int
+    chapter_key: str = ''
+    depth: int = 1
     required: bool = True
     depends_on: list[str] = field(default_factory=list)
     target_words: tuple[int, int] = (500, 1500)
@@ -48,6 +51,8 @@ DEFAULT_SECTIONS: list[PipelineSectionSpec] = [
         key="intro",
         title="Введение",
         order=1,
+        chapter_key="intro",
+        depth=0,
         required=True,
         depends_on=[],
         target_words=(400, 800),
@@ -60,6 +65,8 @@ DEFAULT_SECTIONS: list[PipelineSectionSpec] = [
         key="theory",
         title="Теоретическая часть",
         order=2,
+        chapter_key="theory",
+        depth=0,
         required=True,
         depends_on=["intro"],
         target_words=(800, 1500),
@@ -72,6 +79,8 @@ DEFAULT_SECTIONS: list[PipelineSectionSpec] = [
         key="analysis",
         title="Анализ предметной области",
         order=3,
+        chapter_key="practice",
+        depth=1,
         required=True,
         depends_on=["theory"],
         target_words=(600, 1200),
@@ -84,6 +93,8 @@ DEFAULT_SECTIONS: list[PipelineSectionSpec] = [
         key="architecture",
         title="Архитектура системы",
         order=4,
+        chapter_key="practice",
+        depth=1,
         required=True,
         depends_on=["analysis"],
         target_words=(800, 1500),
@@ -96,6 +107,8 @@ DEFAULT_SECTIONS: list[PipelineSectionSpec] = [
         key="implementation",
         title="Реализация",
         order=5,
+        chapter_key="practice",
+        depth=1,
         required=True,
         depends_on=["architecture"],
         target_words=(1000, 2000),
@@ -108,6 +121,8 @@ DEFAULT_SECTIONS: list[PipelineSectionSpec] = [
         key="testing",
         title="Тестирование",
         order=6,
+        chapter_key="practice",
+        depth=1,
         required=True,
         depends_on=["implementation"],
         target_words=(400, 800),
@@ -120,6 +135,8 @@ DEFAULT_SECTIONS: list[PipelineSectionSpec] = [
         key="conclusion",
         title="Заключение",
         order=7,
+        chapter_key="conclusion",
+        depth=0,
         required=True,
         depends_on=["testing"],
         target_words=(300, 600),
@@ -169,3 +186,110 @@ def get_section_spec(key: str) -> PipelineSectionSpec | None:
 
 def get_all_section_keys() -> list[str]:
     return [spec.key for spec in sorted(DEFAULT_SECTIONS, key=lambda s: s.order)]
+
+
+THEORY_SECTION_TAGS = {
+    'concepts': ['tech_stack', 'frameworks', 'description'],
+    'technologies': ['tech_stack', 'frameworks', 'languages'],
+    'comparison': ['tech_stack', 'frameworks', 'architecture'],
+    'methods': ['architecture', 'modules', 'tech_stack'],
+}
+
+PRACTICE_SECTION_TAGS = {
+    'analysis': ['modules', 'models', 'dependencies'],
+    'architecture': ['architecture', 'modules', 'layers', 'storage', 'queue', 'infra'],
+    'implementation': ['api', 'endpoints', 'models', 'modules'],
+    'testing': ['testing', 'quality'],
+}
+
+
+def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
+    preset = get_work_type_preset(work_type)
+    sections: list[PipelineSectionSpec] = []
+    order = 1
+
+    sections.append(PipelineSectionSpec(
+        key="intro",
+        title="Введение",
+        order=order,
+        chapter_key="intro",
+        depth=0,
+        required=True,
+        depends_on=[],
+        target_words=preset.intro_words,
+        fact_tags=["project_name", "description", "tech_stack", "purpose"],
+        outline_mode=OutlineMode.FULL,
+        needs_summaries=False,
+        constraints=["Не использовать технические детали", "Обосновать актуальность темы"],
+    ))
+    order += 1
+
+    prev_key = "intro"
+    theory_base_order = order
+    for i, (key, title) in enumerate(preset.theory_sections):
+        full_key = f"theory_{key}"
+        fact_tags = THEORY_SECTION_TAGS.get(key, ['tech_stack', 'frameworks'])
+        sections.append(PipelineSectionSpec(
+            key=full_key,
+            title=f"1.{i+1} {title}",
+            order=order,
+            chapter_key="theory",
+            depth=1,
+            required=True,
+            depends_on=[prev_key],
+            target_words=(600, 1200),
+            fact_tags=fact_tags,
+            outline_mode=OutlineMode.STRUCTURE,
+            needs_summaries=True,
+            constraints=["Описать теоретические основы"],
+        ))
+        prev_key = full_key
+        order += 1
+
+    practice_base_order = order
+    for i, (key, title) in enumerate(preset.practice_sections):
+        full_key = f"practice_{key}"
+        fact_tags = PRACTICE_SECTION_TAGS.get(key, ['modules', 'models'])
+        sections.append(PipelineSectionSpec(
+            key=full_key,
+            title=f"2.{i+1} {title}",
+            order=order,
+            chapter_key="practice",
+            depth=1,
+            required=True,
+            depends_on=[prev_key],
+            target_words=(700, 1500),
+            fact_tags=fact_tags,
+            outline_mode=OutlineMode.LOCAL if key in ['implementation', 'testing'] else OutlineMode.STRUCTURE,
+            needs_summaries=True,
+            constraints=["Описать практическую реализацию"],
+        ))
+        prev_key = full_key
+        order += 1
+
+    sections.append(PipelineSectionSpec(
+        key="conclusion",
+        title="Заключение",
+        order=order,
+        chapter_key="conclusion",
+        depth=0,
+        required=True,
+        depends_on=[prev_key],
+        target_words=preset.conclusion_words,
+        fact_tags=["project_name", "purpose"],
+        outline_mode=OutlineMode.FULL,
+        needs_summaries=False,
+        constraints=["Подвести итоги работы", "Описать перспективы развития"],
+    ))
+
+    return sections
+
+
+def get_sections_by_chapter(sections: list[PipelineSectionSpec]) -> dict[str, list[PipelineSectionSpec]]:
+    result: dict[str, list[PipelineSectionSpec]] = {}
+    for spec in sections:
+        chapter = spec.chapter_key or 'other'
+        if chapter not in result:
+            result[chapter] = []
+        result[chapter].append(spec)
+    return result
