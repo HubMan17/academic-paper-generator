@@ -19,6 +19,7 @@ from services.pipeline.steps import (
     ensure_toc,
     ensure_quality_report,
     ensure_enrichment,
+    ensure_literature,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,14 +93,22 @@ class DocumentRunner:
                 progress = 10 + int(((i + 1) / section_count) * 75)
                 self._report_progress(progress, f"Section {key} completed")
 
-            self._report_progress(82, "Running enrichment")
+            self._report_progress(78, "Running enrichment")
             self._run_enrichment(job_id, force)
-            self._report_progress(87, "Assembling document")
-            self._run_assemble(job_id, force)
-            self._report_progress(92, "Generating TOC")
-            self._run_toc(job_id, force)
-            self._report_progress(97, "Running quality checks")
 
+            self._report_progress(82, "Running editing")
+            self._run_editing(job_id, force)
+
+            self._report_progress(86, "Generating literature")
+            self._run_literature(job_id, force)
+
+            self._report_progress(90, "Assembling document")
+            self._run_assemble(job_id, force)
+
+            self._report_progress(94, "Generating TOC")
+            self._run_toc(job_id, force)
+
+            self._report_progress(97, "Running quality checks")
             duration_ms = int((time.time() - start_time) * 1000)
             self._run_quality(job_id, force, duration_ms)
             self._report_progress(100, "Document generation complete")
@@ -360,6 +369,62 @@ class DocumentRunner:
             document_id=self.document_id,
             force=force,
             job_id=job_id,
+            mock_mode=self.mock_mode,
+        )
+        self._track_artifact(kind, was_cached=(existing is not None and not force))
+
+    def _run_editing(self, job_id: UUID | None, force: bool):
+        from asgiref.sync import async_to_sync
+        from apps.projects.models import DocumentArtifact
+        from services.editor import EditorService
+        from services.editor.schema import EditLevel
+
+        document = Document.objects.get(id=self.document_id)
+
+        existing = DocumentArtifact.objects.filter(
+            document=document,
+            kind=DocumentArtifact.Kind.DOCUMENT_EDITED,
+        ).exists()
+
+        if existing and not force:
+            self._track_artifact("document_edited:v1", was_cached=True)
+            return
+
+        if document.current_stage != Document.Stage.EDITING:
+            document.current_stage = Document.Stage.EDITING
+            document.status = Document.Status.EDITING
+            document.save(update_fields=['current_stage', 'status', 'updated_at'])
+
+        doc_profile = document.profile
+        if doc_profile:
+            style_level = doc_profile.style_level
+            if style_level >= 3:
+                level = EditLevel.LEVEL_3
+            elif style_level >= 2:
+                level = EditLevel.LEVEL_2
+            else:
+                level = EditLevel.LEVEL_1
+        else:
+            level = EditLevel.LEVEL_1
+
+        service = EditorService()
+        async_to_sync(service.run_full_pipeline)(
+            document_id=self.document_id,
+            level=level,
+            force=force,
+        )
+
+        self._track_artifact("document_edited:v1", was_cached=False)
+
+    def _run_literature(self, job_id: UUID | None, force: bool):
+        kind = ArtifactKind.LITERATURE.value
+        existing = get_success_artifact(self.document_id, kind)
+
+        ensure_literature(
+            document_id=self.document_id,
+            force=force,
+            job_id=job_id,
+            profile=self.profile,
             mock_mode=self.mock_mode,
         )
         self._track_artifact(kind, was_cached=(existing is not None and not force))

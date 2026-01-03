@@ -299,6 +299,10 @@ class EditorService:
                 idempotency_key=f"{idempotency_prefix}:section:{key}",
             )
 
+            if db_section and result.edited_text:
+                db_section.edited_text = result.edited_text
+                await sync_to_async(db_section.save)(update_fields=['edited_text', 'updated_at'])
+
             await sync_to_async(self._save_artifact)(
                 document=document,
                 section=db_section,
@@ -434,7 +438,7 @@ class EditorService:
             {
                 "key": s.key,
                 "title": s.title,
-                "text": s.text_current,
+                "text": s.enriched_text or s.text_current,
                 "summary": s.summary_current,
             }
             for s in sections

@@ -3,7 +3,6 @@ from typing import Any
 from uuid import UUID
 
 from apps.projects.models import Document, DocumentArtifact
-from services.enrichment import EnrichmentService, enrichment_report_to_dict
 from services.pipeline.ensure import ensure_artifact
 from services.pipeline.kinds import ArtifactKind
 
@@ -22,6 +21,8 @@ def ensure_enrichment(
     kind = ENRICHMENT_REPORT_KIND
 
     def builder() -> dict[str, Any]:
+        from services.enrichment import EnrichmentService, enrichment_report_to_dict
+
         document = Document.objects.get(id=document_id)
 
         if document.current_stage != Document.Stage.ENRICHMENT:
@@ -65,6 +66,7 @@ def ensure_section_enrichment(
     kind = ArtifactKind.section_enriched(section_key)
 
     def builder() -> dict[str, Any]:
+        from services.enrichment import EnrichmentService
         from services.enrichment.schema import enrichment_result_to_dict
 
         service = EnrichmentService(mock_mode=mock_mode)
