@@ -11,6 +11,12 @@ from apps.projects.models import Document, DocumentArtifact, Section
 
 logger = logging.getLogger(__name__)
 
+try:
+    from services.pipeline.locks import step_lock
+    LOCKS_AVAILABLE = True
+except ImportError:
+    LOCKS_AVAILABLE = False
+
 
 class ArtifactStatus:
     RUNNING = "running"
@@ -83,6 +89,7 @@ def ensure_artifact(
     force: bool = False,
     job_id: UUID | None = None,
     section_key: str | None = None,
+    use_lock: bool = True,
 ) -> DocumentArtifact:
     document = Document.objects.get(id=document_id)
     section = None
@@ -95,61 +102,76 @@ def ensure_artifact(
             logger.info(f"Using cached artifact: {kind} for document {document_id}")
             return existing
 
-    artifact = DocumentArtifact.objects.create(
-        document=document,
-        section=section,
-        job_id=job_id,
-        kind=kind,
-        format=DocumentArtifact.Format.JSON,
-        source="pipeline",
-        version="v1",
-        meta={
-            "status": ArtifactStatus.RUNNING,
-            "started_at": datetime.utcnow().isoformat(),
-        },
-    )
+    def _create_artifact() -> DocumentArtifact:
+        if not force:
+            existing = get_success_artifact(document_id, kind)
+            if existing:
+                logger.info(f"Using cached artifact (after lock): {kind} for document {document_id}")
+                return existing
 
-    try:
-        result = builder_fn()
+        artifact = DocumentArtifact.objects.create(
+            document=document,
+            section=section,
+            job_id=job_id,
+            kind=kind,
+            format=DocumentArtifact.Format.JSON,
+            source="pipeline",
+            version="v1",
+            meta={
+                "status": ArtifactStatus.RUNNING,
+                "started_at": datetime.utcnow().isoformat(),
+            },
+        )
 
-        data_json = result.get("data_json")
-        content_text = result.get("content_text")
-        format_type = result.get("format", DocumentArtifact.Format.JSON)
-        extra_meta = result.get("meta", {})
+        try:
+            result = builder_fn()
 
-        content_hash = ""
-        if data_json:
-            content_hash = compute_content_hash(data_json)
-        elif content_text:
-            content_hash = compute_content_hash(content_text)
+            data_json = result.get("data_json")
+            content_text = result.get("content_text")
+            format_type = result.get("format", DocumentArtifact.Format.JSON)
+            extra_meta = result.get("meta", {})
 
-        with transaction.atomic():
-            artifact.data_json = data_json
-            artifact.content_text = content_text
-            artifact.format = format_type
-            artifact.hash = content_hash
+            content_hash = ""
+            if data_json:
+                content_hash = compute_content_hash(data_json)
+            elif content_text:
+                content_hash = compute_content_hash(content_text)
+
+            with transaction.atomic():
+                artifact.data_json = data_json
+                artifact.content_text = content_text
+                artifact.format = format_type
+                artifact.hash = content_hash
+                artifact.meta = {
+                    **artifact.meta,
+                    **extra_meta,
+                    "status": ArtifactStatus.SUCCESS,
+                    "finished_at": datetime.utcnow().isoformat(),
+                }
+                artifact.save()
+
+            logger.info(f"Created artifact: {kind} for document {document_id}")
+            return artifact
+
+        except Exception as e:
+            logger.error(f"Failed to create artifact {kind}: {e}")
             artifact.meta = {
                 **artifact.meta,
-                **extra_meta,
-                "status": ArtifactStatus.SUCCESS,
+                "status": ArtifactStatus.FAILED,
+                "error": str(e),
+                "traceback": traceback.format_exc(),
                 "finished_at": datetime.utcnow().isoformat(),
             }
             artifact.save()
+            raise
 
-        logger.info(f"Created artifact: {kind} for document {document_id}")
-        return artifact
-
-    except Exception as e:
-        logger.error(f"Failed to create artifact {kind}: {e}")
-        artifact.meta = {
-            **artifact.meta,
-            "status": ArtifactStatus.FAILED,
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-            "finished_at": datetime.utcnow().isoformat(),
-        }
-        artifact.save()
-        raise
+    if use_lock and LOCKS_AVAILABLE:
+        with step_lock(document_id, kind) as acquired:
+            if not acquired:
+                logger.warning(f"Could not acquire lock for {kind}, proceeding anyway")
+            return _create_artifact()
+    else:
+        return _create_artifact()
 
 
 def update_artifact_data(
@@ -190,3 +212,33 @@ def mark_artifact_failed(artifact: DocumentArtifact, error: str) -> DocumentArti
     }
     artifact.save()
     return artifact
+
+
+def invalidate_assembly_artifacts(document_id: UUID) -> list[str]:
+    from services.pipeline.kinds import ArtifactKind
+
+    assembly_kinds = [
+        ArtifactKind.DOCUMENT_DRAFT.value,
+        ArtifactKind.TOC.value,
+        ArtifactKind.QUALITY_REPORT.value,
+    ]
+
+    invalidated = []
+    for kind in assembly_kinds:
+        artifacts = DocumentArtifact.objects.filter(
+            document_id=document_id,
+            kind=kind,
+            meta__status=ArtifactStatus.SUCCESS,
+        )
+        count = artifacts.update(
+            meta={
+                "status": ArtifactStatus.FAILED,
+                "invalidated_at": datetime.utcnow().isoformat(),
+                "invalidation_reason": "section_regenerated",
+            }
+        )
+        if count > 0:
+            invalidated.append(kind)
+            logger.info(f"Invalidated {count} artifact(s) of kind {kind} for document {document_id}")
+
+    return invalidated

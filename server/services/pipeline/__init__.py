@@ -2,7 +2,7 @@ from services.pipeline.document_runner import DocumentRunner, RunResult
 from services.pipeline.kinds import ArtifactKind, parse_kind
 from services.pipeline.schemas import (
     DocumentDraft, SectionDraft, Toc, TocItem,
-    QualityReport, QualityIssue, QualityStats,
+    QualityReport, QualityIssue, QualityStats, SectionCoverage,
 )
 from services.pipeline.specs import (
     PipelineSectionSpec, DocumentSpec, SectionBudget,
@@ -17,8 +17,9 @@ from services.pipeline.profiles import (
 from services.pipeline.ensure import (
     ensure_artifact, get_success_artifact, get_artifact_by_kind,
     list_section_kinds, get_latest_summaries,
-    ArtifactStatus,
+    ArtifactStatus, invalidate_assembly_artifacts,
 )
+from services.pipeline.locks import step_lock, try_acquire_lock, release_lock, is_locked
 
 __all__ = [
     "DocumentRunner",
@@ -32,6 +33,7 @@ __all__ = [
     "QualityReport",
     "QualityIssue",
     "QualityStats",
+    "SectionCoverage",
     "PipelineSectionSpec",
     "DocumentSpec",
     "SectionBudget",
@@ -52,4 +54,9 @@ __all__ = [
     "list_section_kinds",
     "get_latest_summaries",
     "ArtifactStatus",
+    "invalidate_assembly_artifacts",
+    "step_lock",
+    "try_acquire_lock",
+    "release_lock",
+    "is_locked",
 ]
