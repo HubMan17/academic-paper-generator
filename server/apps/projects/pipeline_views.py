@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
-from .models import Document, DocumentArtifact
+from .models import Document, DocumentArtifact, Project, AnalysisRun, Artifact, Section
 
 from services.pipeline import (
     DocumentRunner,
@@ -246,3 +246,165 @@ def get_pipeline_sections(request):
                 'needs_summaries': spec.needs_summaries,
             })
     return Response({'sections': sections})
+
+
+@extend_schema(
+    description="Run pipeline synchronously (for testing without Celery)",
+    parameters=[
+        OpenApiParameter(name='step', description='document | section', required=False, type=str),
+        OpenApiParameter(name='key', description='Section key (for step=section)', required=False, type=str),
+        OpenApiParameter(name='profile', description='fast | default | heavy', required=False, type=str),
+    ],
+    tags=["Pipeline"]
+)
+@api_view(['POST'])
+def run_pipeline_sync(request, document_id):
+    doc = get_object_or_404(Document, id=document_id)
+
+    step = request.query_params.get('step', 'document')
+    profile = request.query_params.get('profile', 'fast')
+    key = request.query_params.get('key')
+
+    try:
+        get_profile(profile)
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    runner = DocumentRunner(
+        document_id=document_id,
+        profile=profile,
+        mock_mode=True,
+    )
+
+    job_id = uuid_module.uuid4()
+
+    try:
+        if step == 'document':
+            result = runner.run_full(job_id=job_id, force=False)
+        elif step == 'section':
+            if not key:
+                return Response({'error': 'key required for step=section'}, status=status.HTTP_400_BAD_REQUEST)
+            result = runner.run_section(section_key=key, job_id=job_id, force=True)
+        else:
+            return Response({'error': f'Unknown step: {step}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'success': result.success,
+            'artifacts_created': result.artifacts_created,
+            'artifacts_cached': result.artifacts_cached,
+            'errors': result.errors,
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(
+    description="Create test document with sample facts for pipeline testing",
+    tags=["Pipeline"]
+)
+@api_view(['POST'])
+def create_test_document(request):
+    project = Project.objects.create(
+        repo_url="https://github.com/test/sample-repo",
+    )
+
+    analysis_run = AnalysisRun.objects.create(
+        project=project,
+        status=AnalysisRun.Status.SUCCESS,
+    )
+
+    Artifact.objects.create(
+        analysis_run=analysis_run,
+        kind=Artifact.Kind.FACTS,
+        data={
+            "repo": {
+                "url": "https://github.com/test/sample-repo",
+                "commit": "abc123def456",
+                "detected_at": "2024-01-01T00:00:00Z",
+            },
+            "languages": [
+                {"name": "Python", "ratio": 0.7, "lines_of_code": 5000},
+                {"name": "JavaScript", "ratio": 0.2, "lines_of_code": 1500},
+                {"name": "HTML", "ratio": 0.1, "lines_of_code": 500},
+            ],
+            "frameworks": [
+                {"name": "Django", "type": "backend", "version": "5.0"},
+                {"name": "Django REST Framework", "type": "backend", "version": "3.14"},
+                {"name": "React", "type": "frontend", "version": "18.2"},
+            ],
+            "architecture": {
+                "type": "layered",
+                "layers": ["api", "services", "models"],
+                "evidence": [
+                    {"path": "server/apps/", "description": "Django apps"},
+                    {"path": "server/services/", "description": "Business logic"},
+                    {"path": "client/src/", "description": "React frontend"},
+                ],
+            },
+            "modules": [
+                {"path": "server/apps/core/", "type": "app", "name": "core"},
+                {"path": "server/apps/projects/", "type": "app", "name": "projects"},
+                {"path": "server/services/llm/", "type": "service", "name": "llm"},
+                {"path": "server/services/analyzer/", "type": "service", "name": "analyzer"},
+            ],
+            "dependencies": {
+                "backend": [
+                    {"name": "django", "version": "5.0"},
+                    {"name": "djangorestframework", "version": "3.14"},
+                    {"name": "celery", "version": "5.3"},
+                    {"name": "openai", "version": "1.0"},
+                ],
+                "frontend": [
+                    {"name": "react", "version": "18.2"},
+                    {"name": "tailwindcss", "version": "3.4"},
+                ],
+            },
+            "api": {
+                "endpoints": [
+                    {"method": "POST", "path": "/api/v1/analyze/", "description": "Start analysis"},
+                    {"method": "GET", "path": "/api/v1/jobs/{id}/", "description": "Get job status"},
+                    {"method": "POST", "path": "/api/v1/documents/", "description": "Create document"},
+                    {"method": "GET", "path": "/api/v1/documents/{id}/", "description": "Get document"},
+                ],
+            },
+            "models": [
+                {"name": "Project", "app": "projects", "fields": ["name", "repo_url"]},
+                {"name": "Document", "app": "projects", "fields": ["type", "language", "status"]},
+                {"name": "Section", "app": "projects", "fields": ["key", "title", "content"]},
+            ],
+            "testing": {
+                "framework": "pytest",
+                "coverage": 75,
+                "test_count": 120,
+            },
+        }
+    )
+
+    document = Document.objects.create(
+        analysis_run=analysis_run,
+        type=Document.Type.COURSE,
+        language="ru-RU",
+        target_pages=40,
+        params={
+            "title": "Пояснительная записка к курсовой работе",
+            "topic": "Разработка веб-приложения для генерации документов",
+        },
+    )
+
+    for spec in get_all_section_keys():
+        section_spec = get_section_spec(spec)
+        if section_spec:
+            Section.objects.create(
+                document=document,
+                key=spec,
+                title=section_spec.title,
+                order=section_spec.order,
+                status=Section.Status.IDLE,
+            )
+
+    return Response({
+        'document_id': str(document.id),
+        'project_id': str(project.id),
+        'analysis_run_id': str(analysis_run.id),
+        'message': 'Test document created successfully',
+    }, status=status.HTTP_201_CREATED)
