@@ -10,7 +10,7 @@ from .schema import (
 from . import prompts
 
 
-async def edit_section(
+def edit_section(
     llm_client: LLMClient,
     section_key: str,
     section_text: str,
@@ -39,14 +39,13 @@ async def edit_section(
         edit_suggestions=suggestions,
     )
 
-    result = await llm_client.generate_text(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
+    result = llm_client.generate_text(
+        system=system_prompt,
+        user=user_prompt,
         max_tokens=4000,
-        idempotency_key=idempotency_key,
     )
 
-    edited_text = result.content.strip()
+    edited_text = result.text.strip()
     changes_made = _detect_changes(section_text, edited_text)
 
     return SectionEdited(
@@ -110,7 +109,7 @@ def section_edited_to_dict(section: SectionEdited) -> dict:
     }
 
 
-async def edit_sections_batch(
+def edit_sections_batch(
     llm_client: LLMClient,
     sections: list[dict],
     glossary: Glossary,
@@ -150,7 +149,7 @@ async def edit_sections_batch(
         if idempotency_prefix:
             idempotency_key = f"{idempotency_prefix}:section:{key}"
 
-        result = await edit_section(
+        result = edit_section(
             llm_client=llm_client,
             section_key=key,
             section_text=section.get("text", ""),

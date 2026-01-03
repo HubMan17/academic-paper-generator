@@ -5,7 +5,7 @@ from .schema import Transition, EditPlan
 from . import prompts
 
 
-async def generate_transitions(
+def generate_transitions(
     llm_client: LLMClient,
     sections: list[dict],
     edit_plan: EditPlan,
@@ -31,7 +31,7 @@ async def generate_transitions(
         if idempotency_prefix:
             idempotency_key = f"{idempotency_prefix}:transition:{from_key}:{to_key}"
 
-        transition = await _generate_single_transition(
+        transition = _generate_single_transition(
             llm_client=llm_client,
             from_key=from_key,
             from_text=from_text,
@@ -46,7 +46,7 @@ async def generate_transitions(
     return transitions
 
 
-async def _generate_single_transition(
+def _generate_single_transition(
     llm_client: LLMClient,
     from_key: str,
     from_text: str,
@@ -64,14 +64,13 @@ async def _generate_single_transition(
         to_section_start=to_start,
     )
 
-    result = await llm_client.generate_text(
-        system_prompt=prompts.TRANSITION_SYSTEM,
-        user_prompt=user_prompt,
+    result = llm_client.generate_text(
+        system=prompts.TRANSITION_SYSTEM,
+        user=user_prompt,
         max_tokens=300,
-        idempotency_key=idempotency_key,
     )
 
-    transition_text = result.content.strip()
+    transition_text = result.text.strip()
 
     if len(transition_text) < 20 or len(transition_text) > 500:
         return None

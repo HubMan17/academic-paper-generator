@@ -129,12 +129,25 @@ class EditorService:
 
         await sync_to_async(self._save_artifact)(
             document=document,
-            kind=DocumentArtifact.Kind.QUALITY_REPORT,
+            kind=DocumentArtifact.Kind.EDIT_QUALITY_REPORT,
             data_json=quality_report_to_dict(quality_report),
             version="v1",
         )
 
         return quality_report
+
+    def run_analyze_only(self, document: Document) -> tuple[QualityReport, DocumentArtifact]:
+        sections = self._get_sections_data(document)
+        quality_report = analyze_document(sections)
+
+        artifact = self._save_artifact(
+            document=document,
+            kind=DocumentArtifact.Kind.EDIT_QUALITY_REPORT,
+            data_json=quality_report_to_dict(quality_report),
+            version="v1",
+        )
+
+        return quality_report, artifact
 
     async def step_plan(
         self,
@@ -145,7 +158,7 @@ class EditorService:
         level: EditLevel,
         idempotency_prefix: str,
     ) -> EditPlan:
-        edit_plan = await create_edit_plan(
+        edit_plan = await sync_to_async(create_edit_plan)(
             llm_client=self.llm_client,
             outline=outline,
             section_summaries=summaries,
@@ -169,7 +182,7 @@ class EditorService:
         quality_report: QualityReport,
         idempotency_prefix: str,
     ) -> tuple[Glossary, ConsistencyReport]:
-        glossary = await build_glossary(
+        glossary = await sync_to_async(build_glossary)(
             llm_client=self.llm_client,
             term_candidates=quality_report.term_candidates,
             sections=sections,
@@ -265,7 +278,7 @@ class EditorService:
                 Section.objects.filter(document=document, key=key).first
             )()
 
-            result = await edit_section(
+            result = await sync_to_async(edit_section)(
                 llm_client=self.llm_client,
                 section_key=key,
                 section_text=section.get("text", ""),
@@ -296,7 +309,7 @@ class EditorService:
         edit_plan: EditPlan,
         idempotency_prefix: str,
     ) -> list[Transition]:
-        transitions = await generate_transitions(
+        transitions = await sync_to_async(generate_transitions)(
             llm_client=self.llm_client,
             sections=sections,
             edit_plan=edit_plan,
@@ -318,7 +331,7 @@ class EditorService:
         summaries: list[dict],
         idempotency_prefix: str,
     ) -> list[ChapterConclusion]:
-        conclusions = await generate_chapter_conclusions(
+        conclusions = await sync_to_async(generate_chapter_conclusions)(
             llm_client=self.llm_client,
             outline=outline,
             section_summaries=summaries,
@@ -351,7 +364,7 @@ class EditorService:
         outline = await sync_to_async(self._get_outline)(document)
         document_title = outline.get("title", "Документ")
 
-        return await generate_final_conclusion(
+        return await sync_to_async(generate_final_conclusion)(
             llm_client=self.llm_client,
             document_title=document_title,
             chapter_conclusions=chapter_conclusions,
@@ -396,7 +409,7 @@ class EditorService:
 
         await sync_to_async(self._save_artifact)(
             document=document,
-            kind=DocumentArtifact.Kind.QUALITY_REPORT,
+            kind=DocumentArtifact.Kind.EDIT_QUALITY_REPORT,
             data_json={
                 **quality_report_to_dict(quality_report_v2),
                 "comparison": comparison,
@@ -533,7 +546,7 @@ async def edit_single_section(
 
     quality_report = analyze_document(sections)
 
-    edit_plan = await create_edit_plan(
+    edit_plan = await sync_to_async(create_edit_plan)(
         llm_client=service.llm_client,
         outline=outline,
         section_summaries=summaries,
@@ -541,7 +554,7 @@ async def edit_single_section(
         level=level,
     )
 
-    glossary = await build_glossary(
+    glossary = await sync_to_async(build_glossary)(
         llm_client=service.llm_client,
         term_candidates=quality_report.term_candidates,
         sections=sections,
@@ -567,7 +580,7 @@ async def edit_single_section(
         next_key = ordered_keys[key_index + 1]
         next_text = sections_by_key[next_key].get("text", "")
 
-    result = await edit_section(
+    result = await sync_to_async(edit_section)(
         llm_client=service.llm_client,
         section_key=section_key,
         section_text=section.get("text", ""),

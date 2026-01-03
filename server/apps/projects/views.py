@@ -318,10 +318,10 @@ def run_step(request, job_id):
             )
 
         import uuid as uuid_mod
-        editor_job_id = str(uuid_mod.uuid4())
-        run_editor_analyze_task.delay(str(doc.id), job_id=editor_job_id)
+        trace_id = str(uuid_mod.uuid4())
+        run_editor_analyze_task.delay(str(doc.id), trace_id=trace_id)
         return Response(
-            {"queued": True, "step": step, "job_id": editor_job_id, "document_id": str(doc.id)},
+            {"queued": True, "step": step, "trace_id": trace_id, "document_id": str(doc.id)},
             status=status.HTTP_202_ACCEPTED
         )
 
@@ -343,18 +343,18 @@ def run_step(request, job_id):
         force = request.query_params.get('force', '').lower() in ('1', 'true', 'yes')
 
         import uuid as uuid_mod
-        editor_job_id = str(uuid_mod.uuid4())
+        trace_id = str(uuid_mod.uuid4())
         run_editor_pipeline_task.delay(
             str(doc.id),
             level=level,
             force=force,
-            job_id=editor_job_id
+            trace_id=trace_id
         )
         return Response(
             {
                 "queued": True,
                 "step": step,
-                "job_id": editor_job_id,
+                "trace_id": trace_id,
                 "document_id": str(doc.id),
                 "level": level,
             },
