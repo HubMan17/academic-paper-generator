@@ -28,6 +28,7 @@ from services.analyzer.constants import ANALYZER_VERSION
 from services.documents import DocumentService, SectionBusy
 from services.prompting import get_section_spec, list_section_keys
 from tasks.analyzer_tasks import run_analysis
+from tasks.editor_tasks import run_editor_pipeline_task, run_editor_analyze_task
 
 
 def _make_analysis_fingerprint(repo_url: str, branch: str, params: dict) -> str:
@@ -201,23 +202,37 @@ def get_job_artifacts(request, job_id):
     parameters=[
         OpenApiParameter(
             name='step',
-            description='Step to run: extract, outline, section',
+            description='Step to run: extract, outline, section, analyze, edit',
             required=True,
             type=str,
-            enum=['extract', 'outline', 'section']
+            enum=['extract', 'outline', 'section', 'analyze', 'edit']
         ),
         OpenApiParameter(
             name='key',
             description='Section key (required for step=section)',
             required=False,
             type=str
+        ),
+        OpenApiParameter(
+            name='level',
+            description='Edit level 1-3 (for step=edit)',
+            required=False,
+            type=int
+        ),
+        OpenApiParameter(
+            name='force',
+            description='Force re-run even if already completed',
+            required=False,
+            type=bool
         )
     ],
     responses={202: JobIdResponseSerializer},
     description="[DEV] Запустить отдельный шаг пайплайна. "
                 "step=extract: перезапуск анализа. "
                 "step=outline: генерация outline (нужен Document). "
-                "step=section: генерация секции (key обязателен).",
+                "step=section: генерация секции (key обязателен). "
+                "step=analyze: анализ качества текста. "
+                "step=edit: запуск редактуры документа (level=1,2,3).",
     tags=["Analysis"]
 )
 @api_view(['POST'])
@@ -293,6 +308,58 @@ def run_step(request, job_id):
             )
         except SectionBusy as e:
             return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
+
+    if step == 'analyze':
+        doc = analysis_run.documents.first()
+        if not doc:
+            return Response(
+                {"error": "No document found. Run step=outline first."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        import uuid as uuid_mod
+        editor_job_id = str(uuid_mod.uuid4())
+        run_editor_analyze_task.delay(str(doc.id), job_id=editor_job_id)
+        return Response(
+            {"queued": True, "step": step, "job_id": editor_job_id, "document_id": str(doc.id)},
+            status=status.HTTP_202_ACCEPTED
+        )
+
+    if step == 'edit':
+        doc = analysis_run.documents.first()
+        if not doc:
+            return Response(
+                {"error": "No document found. Run step=outline first."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        level = int(request.query_params.get('level', 1))
+        if level not in [1, 2, 3]:
+            return Response(
+                {"error": "level must be 1, 2, or 3"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        force = request.query_params.get('force', '').lower() in ('1', 'true', 'yes')
+
+        import uuid as uuid_mod
+        editor_job_id = str(uuid_mod.uuid4())
+        run_editor_pipeline_task.delay(
+            str(doc.id),
+            level=level,
+            force=force,
+            job_id=editor_job_id
+        )
+        return Response(
+            {
+                "queued": True,
+                "step": step,
+                "job_id": editor_job_id,
+                "document_id": str(doc.id),
+                "level": level,
+            },
+            status=status.HTTP_202_ACCEPTED
+        )
 
     return Response(
         {"error": f"Unknown step: {step}"},

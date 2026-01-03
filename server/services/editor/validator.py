@@ -55,6 +55,13 @@ def compare_quality_reports(
     elif after_empty > before_empty:
         regressions.append(f"Пустых секций больше: {before_empty} → {after_empty}")
 
+    before_markers = sum(before.style_marker_counts.values())
+    after_markers = sum(after.style_marker_counts.values())
+    if after_markers < before_markers:
+        improvements.append(f"Шаблонных фраз меньше: {before_markers} → {after_markers}")
+    elif after_markers > before_markers:
+        regressions.append(f"Шаблонных фраз больше: {before_markers} → {after_markers}")
+
     return {
         "improvements": improvements,
         "regressions": regressions,
@@ -66,6 +73,7 @@ def compare_quality_reports(
                 "global_repeats": before_repeats,
                 "short_sections": before_short,
                 "style_issues": before_style,
+                "style_markers": before_markers,
             },
             "after": {
                 "total_chars": after.total_chars,
@@ -73,6 +81,7 @@ def compare_quality_reports(
                 "global_repeats": after_repeats,
                 "short_sections": after_short,
                 "style_issues": after_style,
+                "style_markers": after_markers,
             },
         },
         "is_improved": len(improvements) > len(regressions),
@@ -132,4 +141,6 @@ def quality_report_to_dict(report: QualityReport) -> dict:
         "short_sections": report.short_sections,
         "empty_sections": report.empty_sections,
         "style_issues": report.style_issues,
+        "style_marker_counts": report.style_marker_counts,
+        "total_style_markers": sum(report.style_marker_counts.values()),
     }
