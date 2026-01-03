@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from services.analyzer import RepoAnalyzer
 from services.analyzer.constants import ANALYZER_VERSION
+from services.utils import compute_content_hash
 
 
 @shared_task(bind=True, max_retries=3)
@@ -91,12 +92,16 @@ def run_analysis(self, job_id: str, repo_url: str) -> dict:
         if facts.get('repo', {}).get('commit'):
             analysis_run.commit_sha = facts['repo']['commit']
 
-        Artifact.objects.create(
+        facts_hash = compute_content_hash(facts)
+        Artifact.objects.update_or_create(
             analysis_run=analysis_run,
             kind=Artifact.Kind.FACTS,
-            source='analyzer',
-            version=ANALYZER_VERSION,
-            data=facts
+            hash=facts_hash,
+            defaults={
+                'source': 'analyzer',
+                'version': ANALYZER_VERSION,
+                'data': facts
+            }
         )
 
         save_trace()

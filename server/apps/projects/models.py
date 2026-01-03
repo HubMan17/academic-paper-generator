@@ -87,6 +87,7 @@ class DocumentArtifact(models.Model):
         OUTLINE = 'outline', 'Outline JSON'
         SECTION_TEXT = 'section_text', 'Section Text'
         SECTION_SUMMARY = 'section_summary', 'Section Summary'
+        TRACE = 'trace', 'Generation Trace'
 
     class Format(models.TextChoices):
         JSON = 'json', 'JSON'

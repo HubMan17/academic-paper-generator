@@ -10,6 +10,7 @@ from apps.projects.models import (
 )
 from services.llm import LLMClient
 from services.llm.errors import LLMError
+from services.utils import compute_content_hash
 
 from .prompts import (
     OUTLINE_SYSTEM, OUTLINE_USER_TEMPLATE,
@@ -144,15 +145,27 @@ class DocumentService:
                 "job_id": job_id
             }
 
+        content_hash = compute_content_hash(outline_data)
+
         with transaction.atomic():
-            artifact = DocumentArtifact.objects.create(
+            artifact, created = DocumentArtifact.objects.get_or_create(
                 document=document,
-                job_id=uuid.UUID(job_id) if job_id else None,
                 kind=DocumentArtifact.Kind.OUTLINE,
-                format=DocumentArtifact.Format.JSON,
-                data_json=outline_data,
-                meta=meta
+                hash=content_hash,
+                defaults={
+                    'job_id': uuid.UUID(job_id) if job_id else None,
+                    'format': DocumentArtifact.Format.JSON,
+                    'data_json': outline_data,
+                    'meta': meta,
+                    'source': 'llm' if not self.mock_mode else 'mock',
+                    'version': 'v1',
+                }
             )
+            if not created:
+                artifact.meta = meta
+                artifact.job_id = uuid.UUID(job_id) if job_id else None
+                artifact.save(update_fields=['meta', 'job_id'])
+
             document.outline_current = artifact
             document.save(update_fields=['outline_current', 'updated_at'])
 
@@ -215,6 +228,8 @@ class DocumentService:
                     "job_id": job_id
                 }
 
+            content_hash = compute_content_hash(content_text)
+
             with transaction.atomic():
                 artifact = DocumentArtifact.objects.create(
                     document=document,
@@ -223,6 +238,9 @@ class DocumentService:
                     kind=DocumentArtifact.Kind.SECTION_TEXT,
                     format=DocumentArtifact.Format.MARKDOWN,
                     content_text=content_text,
+                    hash=content_hash,
+                    source='llm' if not self.mock_mode else 'mock',
+                    version='v1',
                     meta=meta
                 )
 

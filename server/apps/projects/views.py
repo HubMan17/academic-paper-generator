@@ -247,12 +247,11 @@ def run_step(request, job_id):
         )
 
     if step == 'outline':
+        service = DocumentService()
         doc = analysis_run.documents.first()
         if not doc:
-            service = DocumentService()
             doc = service.create_document(str(job_id))
 
-        service = DocumentService()
         outline_job_id = service.request_outline(str(doc.id))
         return Response(
             {"queued": True, "step": step, "job_id": outline_job_id, "document_id": str(doc.id)},
@@ -272,6 +271,13 @@ def run_step(request, job_id):
             return Response(
                 {"error": "No document found. Run step=outline first."},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not doc.sections.filter(key=key).exists():
+            valid_keys = list(doc.sections.values_list('key', flat=True))
+            return Response(
+                {"error": f"Section '{key}' not found. Valid keys: {valid_keys}"},
+                status=status.HTTP_404_NOT_FOUND
             )
 
         try:
