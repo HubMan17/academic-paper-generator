@@ -154,52 +154,95 @@ def _extract_facts_from_analyzer(facts: dict[str, Any]) -> list[dict[str, Any]]:
     return extracted
 
 
+TAG_WEIGHTS = {
+    "project_name": 2.0,
+    "description": 1.5,
+    "tech_stack": 2.0,
+    "languages": 1.5,
+    "frameworks": 1.5,
+    "architecture": 2.5,
+    "modules": 2.0,
+    "layers": 1.5,
+    "api": 2.5,
+    "endpoints": 2.0,
+    "models": 1.5,
+    "storage": 1.5,
+    "auth": 1.5,
+    "frontend": 1.5,
+    "routes": 1.0,
+    "infra": 1.0,
+    "purpose": 1.0,
+    "repo": 0.5,
+}
+
+
+def _score_fact(fact: dict[str, Any], spec: SectionSpec) -> tuple[float, str]:
+    score = 0.0
+    reasons = []
+
+    fact_tags = fact.get("tags", [])
+    fact_key = fact.get("key_path", "")
+
+    if fact_key in spec.fact_keys:
+        score += 3.0
+        reasons.append(f"key:{fact_key}")
+
+    for tag in spec.fact_tags:
+        if tag in fact_tags:
+            tag_weight = TAG_WEIGHTS.get(tag, 1.0)
+            score += tag_weight
+            reasons.append(f"tag:{tag}(+{tag_weight})")
+
+    text = fact.get("text", "")
+    if len(text) < 100:
+        score += 0.3
+    elif len(text) > 500:
+        score -= 0.2
+
+    if not reasons:
+        return 0.0, ""
+
+    return score, reasons[0] if reasons else ""
+
+
 def select_facts(
     spec: SectionSpec,
     facts: dict[str, Any],
     max_facts: int = 30
 ) -> tuple[list[dict[str, Any]], list[FactRef]]:
-    selected_facts = []
-    fact_refs = []
-
     if not isinstance(facts, dict):
-        return selected_facts, fact_refs
+        return [], []
 
     if "facts" in facts and isinstance(facts["facts"], list):
         facts_list = facts["facts"]
     else:
         facts_list = _extract_facts_from_analyzer(facts)
 
+    scored_facts = []
+
     for fact in facts_list:
         if not isinstance(fact, dict):
             continue
 
         fact_id = fact.get("id", "")
-        fact_tags = fact.get("tags", [])
-        fact_key = fact.get("key_path", "")
-
         if not fact_id:
             continue
 
-        selected = False
-        reason = ""
+        score, reason = _score_fact(fact, spec)
+        if score > 0:
+            scored_facts.append((score, reason, fact))
 
-        if fact_key in spec.fact_keys:
-            selected = True
-            reason = f"key:{fact_key}"
+    scored_facts.sort(key=lambda x: x[0], reverse=True)
 
-        if not selected:
-            for tag in spec.fact_tags:
-                if tag in fact_tags:
-                    selected = True
-                    reason = f"tag:{tag}"
-                    break
+    selected_facts = []
+    fact_refs = []
 
-        if selected:
-            selected_facts.append(fact)
-            fact_refs.append(FactRef(fact_id=fact_id, reason=reason))
-
-            if len(selected_facts) >= max_facts:
-                break
+    for score, reason, fact in scored_facts[:max_facts]:
+        selected_facts.append(fact)
+        fact_refs.append(FactRef(
+            fact_id=fact.get("id", ""),
+            reason=reason,
+            weight=round(score, 2)
+        ))
 
     return selected_facts, fact_refs
