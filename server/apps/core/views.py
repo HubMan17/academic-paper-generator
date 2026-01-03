@@ -269,3 +269,131 @@ def prompting_slice_api(request):
 
 def test_pipeline_page(request):
     return render(request, 'core/test_pipeline.html')
+
+
+@extend_schema(
+    responses={200: dict},
+    description="Запускает полный пайплайн генерации документа",
+    tags=["Pipeline"]
+)
+@api_view(['POST'])
+def pipeline_run_api(request):
+    work_type = request.data.get('work_type', 'referat')
+    profile = request.data.get('profile', 'default')
+    topic_title = request.data.get('topic_title', 'Разработка программного обеспечения')
+    topic_description = request.data.get('topic_description', '')
+    facts = request.data.get('facts')
+    mock_mode = request.data.get('mock_mode', True)
+
+    try:
+        if mock_mode:
+            from services.pipeline.work_types import WORK_TYPE_PRESETS
+
+            preset = WORK_TYPE_PRESETS.get(work_type)
+            if not preset:
+                preset = WORK_TYPE_PRESETS['referat']
+
+            mock_outline = {
+                "chapters": [
+                    {
+                        "key": "intro",
+                        "title": "Введение",
+                        "sections": [
+                            {"key": "intro.main", "title": "Введение", "target_words": 500}
+                        ]
+                    },
+                    {
+                        "key": "chapter1",
+                        "title": "Теоретическая часть",
+                        "sections": [
+                            {"key": "chapter1.overview", "title": "Обзор предметной области", "target_words": 800},
+                            {"key": "chapter1.tech", "title": "Анализ технологий", "target_words": 600}
+                        ]
+                    },
+                    {
+                        "key": "chapter2",
+                        "title": "Практическая часть",
+                        "sections": [
+                            {"key": "chapter2.design", "title": "Проектирование системы", "target_words": 700},
+                            {"key": "chapter2.impl", "title": "Реализация", "target_words": 800}
+                        ]
+                    },
+                    {
+                        "key": "conclusion",
+                        "title": "Заключение",
+                        "sections": [
+                            {"key": "conclusion.main", "title": "Заключение", "target_words": 400}
+                        ]
+                    }
+                ]
+            }
+
+            mock_sections = []
+            total_words = 0
+            for chapter in mock_outline['chapters']:
+                for section in chapter['sections']:
+                    words = section['target_words']
+                    mock_sections.append({
+                        "chapter_key": section['key'],
+                        "title": section['title'],
+                        "text": f"[Содержимое секции '{section['title']}' - {words} слов]\n\n" + "Lorem ipsum... " * (words // 10),
+                        "word_count": words
+                    })
+                    total_words += words
+
+            mock_literature = {
+                "sources": [
+                    {
+                        "type": "web",
+                        "citation": "Django Documentation [Электронный ресурс]. — URL: https://docs.djangoproject.com/",
+                        "relevance": "technology"
+                    },
+                    {
+                        "type": "book",
+                        "citation": "Мартин Р. Чистая архитектура. — СПб.: Питер, 2018. — 352 с.",
+                        "relevance": "architecture"
+                    },
+                    {
+                        "type": "book",
+                        "citation": "Гамма Э. и др. Паттерны проектирования. — СПб.: Питер, 2020. — 368 с.",
+                        "relevance": "methodology"
+                    }
+                ]
+            }
+
+            mock_quality = {
+                "total_words": total_words,
+                "sections_count": len(mock_sections),
+                "completeness_score": 0.85,
+                "issues": []
+            }
+
+            result = {
+                "outline": mock_outline,
+                "sections": mock_sections,
+                "sections_count": len(mock_sections),
+                "total_words": total_words,
+                "literature": mock_literature,
+                "sources_count": len(mock_literature['sources']),
+                "quality_report": mock_quality,
+                "work_type": work_type,
+                "profile": profile,
+                "mock": True
+            }
+        else:
+            result = {
+                "error": "Real pipeline execution not implemented in test API",
+                "mock": False
+            }
+
+        return Response({
+            "status": "success",
+            "result": result,
+            "error": None
+        })
+
+    except Exception as e:
+        return Response(
+            {"status": "error", "error": str(e), "result": None},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

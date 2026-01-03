@@ -23,6 +23,9 @@
                     <button onclick="showTab('context')" id="tab-context" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
                         Context Pack
                     </button>
+                    <button onclick="showTab('pipeline')" id="tab-pipeline" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
+                        Pipeline
+                    </button>
                     <button onclick="showTab('stats')" id="tab-stats" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
                         Статистика
                     </button>
@@ -49,8 +52,8 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
                                 <select id="textModel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <option value="">gpt-4o-mini (default)</option>
-                                    <option value="gpt-4o">gpt-4o</option>
+                                    <option value="">gpt-4o (default)</option>
+                                    <option value="gpt-4o-mini">gpt-4o-mini</option>
                                     <option value="gpt-4-turbo">gpt-4-turbo</option>
                                 </select>
                             </div>
@@ -90,8 +93,9 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
                                 <select id="jsonModel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <option value="">gpt-4o-mini (default)</option>
-                                    <option value="gpt-4o">gpt-4o</option>
+                                    <option value="">gpt-4o (default)</option>
+                                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                                    <option value="gpt-4-turbo">gpt-4-turbo</option>
                                 </select>
                             </div>
                             <div>
@@ -327,6 +331,155 @@
                     <div id="contextError" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
                         <h3 class="text-red-800 font-semibold mb-1">Error</h3>
                         <p id="contextErrorMessage" class="text-red-600 text-sm"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Tab -->
+        <div id="content-pipeline" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Configuration -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Document Pipeline</h2>
+                    <p class="text-sm text-gray-600 mb-4">Тестирование полного пайплайна генерации документа</p>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Тип работы</label>
+                            <select id="pipelineWorkType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="referat">Реферат (10-15 стр)</option>
+                                <option value="course">Курсовая работа (25-35 стр)</option>
+                                <option value="diploma">Дипломная работа (60-80 стр)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Профиль</label>
+                            <select id="pipelineProfile" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="fast">Fast (quick drafts)</option>
+                                <option value="default" selected>Default (balanced)</option>
+                                <option value="heavy">Heavy (maximum quality)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Тема работы</label>
+                            <input type="text" id="pipelineTopicTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" value="Разработка веб-приложения для управления проектами">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Описание (опционально)</label>
+                            <textarea id="pipelineTopicDesc" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Дополнительные детали о работе..."></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Facts JSON</label>
+                            <textarea id="pipelineFacts" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="Вставьте facts.json из Analyzer"></textarea>
+                            <button onclick="loadPipelineFacts()" class="text-xs text-blue-600 hover:text-blue-800 mt-1">Загрузить из Analyzer</button>
+                        </div>
+
+                        <div class="flex items-center">
+                            <input type="checkbox" id="pipelineMockMode" checked class="mr-2">
+                            <label for="pipelineMockMode" class="text-sm text-gray-700">Mock Mode (без LLM)</label>
+                        </div>
+
+                        <button onclick="runPipeline()" id="pipelineRunBtn" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400">
+                            Запустить Pipeline
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progress -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Прогресс</h2>
+
+                    <div id="pipelineProgress" class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-outline">
+                            <span class="text-sm">1. Outline</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-context">
+                            <span class="text-sm">2. Context Pack</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-sections">
+                            <span class="text-sm">3. Sections</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-enrichment">
+                            <span class="text-sm">4. Enrichment</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-editing">
+                            <span class="text-sm">5. Editing</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-literature">
+                            <span class="text-sm">6. Literature</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-assemble">
+                            <span class="text-sm">7. Assemble</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" id="step-quality">
+                            <span class="text-sm">8. Quality Check</span>
+                            <span class="text-xs text-gray-500">ожидание</span>
+                        </div>
+                    </div>
+
+                    <div id="pipelineStats" class="mt-4 hidden">
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="bg-blue-50 rounded-lg p-3">
+                                <p class="text-xl font-bold text-blue-600" id="pipelineTotalSections">0</p>
+                                <p class="text-xs text-gray-600">Sections</p>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-3">
+                                <p class="text-xl font-bold text-green-600" id="pipelineTotalWords">0</p>
+                                <p class="text-xs text-gray-600">Words</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Результат</h2>
+
+                    <div id="pipelineResult" class="hidden space-y-4">
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Outline</h3>
+                            <pre id="pipelineOutline" class="bg-gray-50 p-2 rounded text-xs max-h-40 overflow-y-auto"></pre>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Секции</h3>
+                            <div id="pipelineSections" class="space-y-2 max-h-48 overflow-y-auto"></div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Литература</h3>
+                            <pre id="pipelineLiterature" class="bg-gray-50 p-2 rounded text-xs max-h-32 overflow-y-auto"></pre>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Quality Report</h3>
+                            <pre id="pipelineQuality" class="bg-gray-50 p-2 rounded text-xs max-h-32 overflow-y-auto"></pre>
+                        </div>
+
+                        <button onclick="downloadPipelineResult()" class="w-full bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 text-sm">
+                            Скачать результат
+                        </button>
+                    </div>
+
+                    <div id="pipelineEmpty" class="text-center py-12 text-gray-500">
+                        <p>Нажмите "Запустить Pipeline" для генерации</p>
+                    </div>
+
+                    <div id="pipelineError" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h3 class="text-red-800 font-semibold mb-1">Error</h3>
+                        <p id="pipelineErrorMessage" class="text-red-600 text-sm"></p>
                     </div>
                 </div>
             </div>
@@ -719,6 +872,180 @@
                 document.getElementById('factsInput').value = e.target.result;
             };
             reader.readAsText(file);
+        }
+
+        // Pipeline functions
+        let pipelineData = null;
+
+        function loadPipelineFacts() {
+            if (factsData) {
+                document.getElementById('pipelineFacts').value = JSON.stringify(factsData, null, 2);
+            } else {
+                alert('Сначала выполните анализ репозитория во вкладке Analyzer');
+            }
+        }
+
+        function updateStepStatus(stepId, status, detail = '') {
+            const step = document.getElementById('step-' + stepId);
+            const statusEl = step.querySelector('span:last-child');
+
+            step.classList.remove('bg-gray-50', 'bg-blue-50', 'bg-green-50', 'bg-red-50');
+
+            if (status === 'running') {
+                step.classList.add('bg-blue-50');
+                statusEl.className = 'text-xs text-blue-600';
+                statusEl.textContent = 'выполняется...';
+            } else if (status === 'done') {
+                step.classList.add('bg-green-50');
+                statusEl.className = 'text-xs text-green-600';
+                statusEl.textContent = detail || 'готово';
+            } else if (status === 'error') {
+                step.classList.add('bg-red-50');
+                statusEl.className = 'text-xs text-red-600';
+                statusEl.textContent = detail || 'ошибка';
+            } else {
+                step.classList.add('bg-gray-50');
+                statusEl.className = 'text-xs text-gray-500';
+                statusEl.textContent = 'ожидание';
+            }
+        }
+
+        function resetPipelineSteps() {
+            ['outline', 'context', 'sections', 'enrichment', 'editing', 'literature', 'assemble', 'quality'].forEach(step => {
+                updateStepStatus(step, 'pending');
+            });
+        }
+
+        async function runPipeline() {
+            const btn = document.getElementById('pipelineRunBtn');
+            btn.disabled = true;
+            document.getElementById('pipelineError').classList.add('hidden');
+            document.getElementById('pipelineResult').classList.add('hidden');
+            document.getElementById('pipelineEmpty').classList.add('hidden');
+            document.getElementById('pipelineStats').classList.add('hidden');
+
+            resetPipelineSteps();
+
+            const workType = document.getElementById('pipelineWorkType').value;
+            const profile = document.getElementById('pipelineProfile').value;
+            const topicTitle = document.getElementById('pipelineTopicTitle').value;
+            const topicDesc = document.getElementById('pipelineTopicDesc').value;
+            const factsText = document.getElementById('pipelineFacts').value.trim();
+            const mockMode = document.getElementById('pipelineMockMode').checked;
+
+            let facts = null;
+            if (factsText) {
+                try {
+                    facts = JSON.parse(factsText);
+                } catch (e) {
+                    document.getElementById('pipelineErrorMessage').textContent = 'Invalid facts JSON: ' + e.message;
+                    document.getElementById('pipelineError').classList.remove('hidden');
+                    btn.disabled = false;
+                    return;
+                }
+            }
+
+            try {
+                updateStepStatus('outline', 'running');
+                const response = await fetch('/api/v1/pipeline/run/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        work_type: workType,
+                        profile: profile,
+                        topic_title: topicTitle,
+                        topic_description: topicDesc,
+                        facts: facts,
+                        mock_mode: mockMode,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    pipelineData = data.result;
+
+                    // Update step statuses
+                    updateStepStatus('outline', 'done');
+                    updateStepStatus('context', 'done');
+                    updateStepStatus('sections', 'done', `${data.result.sections_count} секций`);
+                    updateStepStatus('enrichment', 'done');
+                    updateStepStatus('editing', 'done');
+                    updateStepStatus('literature', 'done', `${data.result.sources_count || 0} источников`);
+                    updateStepStatus('assemble', 'done');
+                    updateStepStatus('quality', 'done');
+
+                    // Display results
+                    displayPipelineResults(data.result);
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (err) {
+                document.getElementById('pipelineErrorMessage').textContent = err.message;
+                document.getElementById('pipelineError').classList.remove('hidden');
+
+                // Mark current step as error
+                const steps = ['outline', 'context', 'sections', 'enrichment', 'editing', 'literature', 'assemble', 'quality'];
+                for (const step of steps) {
+                    const stepEl = document.getElementById('step-' + step);
+                    if (stepEl.classList.contains('bg-blue-50')) {
+                        updateStepStatus(step, 'error');
+                        break;
+                    }
+                }
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function displayPipelineResults(result) {
+            // Outline
+            if (result.outline) {
+                document.getElementById('pipelineOutline').textContent = JSON.stringify(result.outline, null, 2);
+            }
+
+            // Sections
+            const sectionsDiv = document.getElementById('pipelineSections');
+            sectionsDiv.innerHTML = '';
+            if (result.sections) {
+                result.sections.forEach((section, i) => {
+                    const div = document.createElement('details');
+                    div.className = 'bg-gray-50 rounded p-2';
+                    div.innerHTML = `
+                        <summary class="cursor-pointer text-sm font-medium">${section.title || section.chapter_key} (${section.word_count || 0} слов)</summary>
+                        <p class="text-xs text-gray-600 mt-2 whitespace-pre-wrap">${(section.text || '').substring(0, 500)}${(section.text || '').length > 500 ? '...' : ''}</p>
+                    `;
+                    sectionsDiv.appendChild(div);
+                });
+            }
+
+            // Literature
+            if (result.literature) {
+                document.getElementById('pipelineLiterature').textContent = JSON.stringify(result.literature, null, 2);
+            }
+
+            // Quality
+            if (result.quality_report) {
+                document.getElementById('pipelineQuality').textContent = JSON.stringify(result.quality_report, null, 2);
+            }
+
+            // Stats
+            document.getElementById('pipelineTotalSections').textContent = result.sections_count || 0;
+            document.getElementById('pipelineTotalWords').textContent = result.total_words || 0;
+            document.getElementById('pipelineStats').classList.remove('hidden');
+
+            document.getElementById('pipelineResult').classList.remove('hidden');
+        }
+
+        function downloadPipelineResult() {
+            if (!pipelineData) return;
+            const blob = new Blob([JSON.stringify(pipelineData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'document_result.json';
+            a.click();
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>

@@ -28,6 +28,10 @@ class OpenAIProvider:
     def default_model(self) -> str:
         return self._default_model
 
+    def _uses_completion_tokens_param(self, model: str) -> bool:
+        new_api_models = ("gpt-4o", "o1-preview", "o1-mini", "o1", "gpt-5")
+        return any(model.startswith(prefix) for prefix in new_api_models)
+
     def chat_completion(
         self,
         system: str,
@@ -51,7 +55,10 @@ class OpenAIProvider:
         }
 
         if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
+            if self._uses_completion_tokens_param(model):
+                kwargs["max_completion_tokens"] = max_tokens
+            else:
+                kwargs["max_tokens"] = max_tokens
 
         if response_format:
             kwargs["response_format"] = response_format
