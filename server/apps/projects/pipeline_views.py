@@ -19,6 +19,12 @@ from services.pipeline import (
     get_section_spec,
 )
 from services.pipeline.tasks import run_document_task, run_section_task, resume_document_task
+from services.editor import (
+    EditorService,
+    EditLevel,
+    analyze_document,
+    quality_report_to_dict,
+)
 
 
 @extend_schema(
@@ -111,12 +117,30 @@ def pipeline_status(request, document_id):
     toc = get_success_artifact(document_id, ArtifactKind.TOC.value)
     quality = get_success_artifact(document_id, ArtifactKind.QUALITY_REPORT.value)
 
+    edited = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.DOCUMENT_EDITED
+    ).first()
+    glossary = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.GLOSSARY
+    ).first()
+    edit_plan = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.EDIT_PLAN
+    ).first()
+
     sections_status = []
     for key in get_all_section_keys():
         spec = get_section_spec(key)
         context_pack = get_success_artifact(document_id, ArtifactKind.context_pack(key))
         section = get_success_artifact(document_id, ArtifactKind.section(key))
         summary = get_success_artifact(document_id, ArtifactKind.section_summary(key))
+        section_edited = DocumentArtifact.objects.filter(
+            document_id=document_id,
+            section__key=key,
+            kind=DocumentArtifact.Kind.SECTION_EDITED
+        ).first()
 
         sections_status.append({
             'key': key,
@@ -125,9 +149,11 @@ def pipeline_status(request, document_id):
             'has_context_pack': context_pack is not None,
             'has_section': section is not None,
             'has_summary': summary is not None,
+            'has_edited': section_edited is not None,
             'context_pack_id': str(context_pack.id) if context_pack else None,
             'section_id': str(section.id) if section else None,
             'summary_id': str(summary.id) if summary else None,
+            'edited_id': str(section_edited.id) if section_edited else None,
         })
 
     return Response({
@@ -137,10 +163,16 @@ def pipeline_status(request, document_id):
         'has_draft': draft is not None,
         'has_toc': toc is not None,
         'has_quality_report': quality is not None,
+        'has_edited': edited is not None,
+        'has_glossary': glossary is not None,
+        'has_edit_plan': edit_plan is not None,
         'outline_id': str(outline.id) if outline else None,
         'draft_id': str(draft.id) if draft else None,
         'toc_id': str(toc.id) if toc else None,
         'quality_report_id': str(quality.id) if quality else None,
+        'edited_id': str(edited.id) if edited else None,
+        'glossary_id': str(glossary.id) if glossary else None,
+        'edit_plan_id': str(edit_plan.id) if edit_plan else None,
         'sections': sections_status,
     })
 
@@ -251,19 +283,70 @@ def get_pipeline_sections(request):
 @extend_schema(
     description="Run pipeline synchronously (for testing without Celery)",
     parameters=[
-        OpenApiParameter(name='step', description='document | section', required=False, type=str),
+        OpenApiParameter(name='step', description='document | section | analyze | edit', required=False, type=str),
         OpenApiParameter(name='key', description='Section key (for step=section)', required=False, type=str),
         OpenApiParameter(name='profile', description='fast | default | heavy', required=False, type=str),
+        OpenApiParameter(name='level', description='Edit level 1-3 (for step=edit)', required=False, type=int),
     ],
     tags=["Pipeline"]
 )
 @api_view(['POST'])
 def run_pipeline_sync(request, document_id):
+    import asyncio
+
     doc = get_object_or_404(Document, id=document_id)
 
     step = request.query_params.get('step', 'document')
     profile = request.query_params.get('profile', 'fast')
     key = request.query_params.get('key')
+    level = int(request.query_params.get('level', 1))
+
+    if step == 'analyze':
+        service = EditorService()
+        sections = service._get_sections_data(doc)
+        quality_report = analyze_document(sections)
+
+        artifact = DocumentArtifact.objects.create(
+            document=doc,
+            kind=DocumentArtifact.Kind.QUALITY_REPORT,
+            format=DocumentArtifact.Format.JSON,
+            data_json=quality_report_to_dict(quality_report),
+            version='v1',
+        )
+
+        return Response({
+            'success': True,
+            'artifact_id': str(artifact.id),
+            'total_chars': quality_report.total_chars,
+            'total_words': quality_report.total_words,
+            'style_markers': sum(quality_report.style_marker_counts.values()),
+            'global_repeats': len(quality_report.global_repeats),
+        })
+
+    if step == 'edit':
+        if level not in [1, 2, 3]:
+            return Response({'error': 'level must be 1, 2, or 3'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            service = EditorService()
+            edit_level = EditLevel(level)
+
+            result = asyncio.run(
+                service.run_full_pipeline(
+                    document_id=document_id,
+                    level=edit_level,
+                    force=False,
+                )
+            )
+
+            return Response({
+                'success': True,
+                'sections_edited': len(result.sections),
+                'transitions_count': len(result.transitions),
+                'chapter_conclusions': len(result.chapter_conclusions),
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     try:
         get_profile(profile)
@@ -296,6 +379,72 @@ def run_pipeline_sync(request, document_id):
         })
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(
+    description="Get edited document artifact",
+    tags=["Pipeline"]
+)
+@api_view(['GET'])
+def get_document_edited(request, document_id):
+    doc = get_object_or_404(Document, id=document_id)
+    edited = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.DOCUMENT_EDITED
+    ).order_by('-created_at').first()
+
+    if not edited:
+        return Response({'error': 'Edited document not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'artifact_id': str(edited.id),
+        'created_at': edited.created_at.isoformat(),
+        'data': edited.data_json,
+    })
+
+
+@extend_schema(
+    description="Get glossary artifact",
+    tags=["Pipeline"]
+)
+@api_view(['GET'])
+def get_glossary(request, document_id):
+    doc = get_object_or_404(Document, id=document_id)
+    glossary = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.GLOSSARY
+    ).order_by('-created_at').first()
+
+    if not glossary:
+        return Response({'error': 'Glossary not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'artifact_id': str(glossary.id),
+        'created_at': glossary.created_at.isoformat(),
+        'data': glossary.data_json,
+    })
+
+
+@extend_schema(
+    description="Get edit plan artifact",
+    tags=["Pipeline"]
+)
+@api_view(['GET'])
+def get_edit_plan(request, document_id):
+    doc = get_object_or_404(Document, id=document_id)
+    edit_plan = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.EDIT_PLAN
+    ).order_by('-created_at').first()
+
+    if not edit_plan:
+        return Response({'error': 'Edit plan not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'artifact_id': str(edit_plan.id),
+        'created_at': edit_plan.created_at.isoformat(),
+        'data': edit_plan.data_json,
+    })
 
 
 @extend_schema(

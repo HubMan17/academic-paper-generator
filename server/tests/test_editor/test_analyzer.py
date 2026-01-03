@@ -7,6 +7,7 @@ from services.editor.analyzer import (
     _find_repeat_phrases,
     _extract_term_candidates,
     _detect_style_issues,
+    _count_style_markers,
 )
 
 
@@ -201,3 +202,46 @@ class TestDetectStyleIssues:
         text = "Система обеспечивает надёжную работу. Архитектура спроектирована с учётом масштабируемости."
         issues = _detect_style_issues(text)
         assert len(issues) == 0 or all("отсутствует" not in i.lower() for i in issues)
+
+
+class TestCountStyleMarkers:
+    def test_count_template_markers(self):
+        text = "Важно отметить, что система работает. В современных условиях это важно отметить ещё раз."
+        counts = _count_style_markers(text)
+        assert "важно отметить" in counts
+        assert counts["важно отметить"] == 2
+
+    def test_count_various_markers(self):
+        text = """
+        На сегодняшний день система активно используется.
+        Таким образом, подводя итог, можно сказать следующее.
+        Актуальность темы обусловлена потребностями рынка.
+        """
+        counts = _count_style_markers(text)
+        assert "на сегодняшний день" in counts
+        assert "таким образом" in counts
+        assert "подводя итог" in counts
+        assert "актуальность темы обусловлена" in counts
+
+    def test_no_markers(self):
+        text = "Система обеспечивает надёжную работу. Архитектура спроектирована корректно."
+        counts = _count_style_markers(text)
+        assert len(counts) == 0
+
+    def test_case_insensitive(self):
+        text = "ВАЖНО ОТМЕТИТЬ, что это работает. Важно Отметить ещё раз."
+        counts = _count_style_markers(text)
+        assert "важно отметить" in counts
+        assert counts["важно отметить"] == 2
+
+    def test_quality_report_includes_markers(self):
+        sections = [
+            {
+                "key": "intro",
+                "title": "Введение",
+                "text": "Важно отметить, что система работает. В современных условиях это актуально."
+            },
+        ]
+        report = analyze_document(sections)
+        assert "важно отметить" in report.style_marker_counts
+        assert "в современных условиях" in report.style_marker_counts

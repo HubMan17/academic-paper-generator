@@ -40,6 +40,7 @@ class QualityReport:
     short_sections: list[str]
     empty_sections: list[str]
     style_issues: list[str]
+    style_marker_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass

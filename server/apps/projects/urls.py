@@ -27,6 +27,9 @@ urlpatterns = [
     path('documents/<uuid:document_id>/pipeline/draft/', pipeline_views.get_document_draft, name='get_document_draft'),
     path('documents/<uuid:document_id>/pipeline/toc/', pipeline_views.get_toc, name='get_toc'),
     path('documents/<uuid:document_id>/pipeline/quality/', pipeline_views.get_quality_report, name='get_quality_report'),
+    path('documents/<uuid:document_id>/pipeline/edited/', pipeline_views.get_document_edited, name='get_document_edited'),
+    path('documents/<uuid:document_id>/pipeline/glossary/', pipeline_views.get_glossary, name='get_glossary'),
+    path('documents/<uuid:document_id>/pipeline/edit-plan/', pipeline_views.get_edit_plan, name='get_edit_plan'),
 
     path('pipeline/profiles/', pipeline_views.get_profiles, name='get_profiles'),
     path('pipeline/sections/', pipeline_views.get_pipeline_sections, name='get_pipeline_sections'),

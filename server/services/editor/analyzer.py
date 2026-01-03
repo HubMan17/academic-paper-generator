@@ -13,6 +13,28 @@ MIN_REPEAT_COUNT = 2
 MIN_SECTION_CHARS = 500
 NGRAM_SIZES = [3, 4, 5]
 
+TEMPLATE_MARKERS = [
+    "отсутствует информация",
+    "данные не предоставлены",
+    "информация недоступна",
+    "не удалось найти",
+    "важно отметить",
+    "следует отметить",
+    "необходимо подчеркнуть",
+    "стоит отметить",
+    "нельзя не отметить",
+    "в современных условиях",
+    "на сегодняшний день",
+    "в настоящее время",
+    "в наши дни",
+    "таким образом",
+    "итак",
+    "подводя итог",
+    "резюмируя вышесказанное",
+    "актуальность темы обусловлена",
+    "актуальность исследования",
+]
+
 
 def analyze_document(sections: list[dict]) -> QualityReport:
     section_metrics = []
@@ -55,6 +77,7 @@ def analyze_document(sections: list[dict]) -> QualityReport:
 
     global_repeats = _find_global_repeats(all_text_combined, sections)
     style_issues = _detect_style_issues(all_text_combined)
+    style_marker_counts = _count_style_markers(all_text_combined)
 
     total_chars = sum(m.char_count for m in section_metrics)
     total_words = sum(m.word_count for m in section_metrics)
@@ -69,6 +92,7 @@ def analyze_document(sections: list[dict]) -> QualityReport:
         short_sections=short_sections,
         empty_sections=empty_sections,
         style_issues=style_issues,
+        style_marker_counts=style_marker_counts,
     )
 
 
@@ -234,11 +258,12 @@ def _detect_section_issues(text: str, char_count: int, avg_sentence_length: floa
 
 def _detect_style_issues(text: str) -> list[str]:
     issues: list[str] = []
+    text_lower = text.lower()
 
-    if "отсутствует информация" in text.lower():
+    if "отсутствует информация" in text_lower:
         issues.append("Найдено 'отсутствует информация' — заменить на нейтральную формулировку")
 
-    if "не удалось найти" in text.lower() or "не найдено" in text.lower():
+    if "не удалось найти" in text_lower or "не найдено" in text_lower:
         issues.append("Найдены фразы о ненайденных данных — переформулировать")
 
     first_person = re.findall(r'\b(?:я|мы|мной|нами|наш[аеиу]?)\b', text, re.IGNORECASE)
@@ -250,3 +275,15 @@ def _detect_style_issues(text: str) -> list[str]:
         issues.append(f"Восклицательные знаки ({exclamations}) — не характерны для академического стиля")
 
     return issues
+
+
+def _count_style_markers(text: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    text_lower = text.lower()
+
+    for marker in TEMPLATE_MARKERS:
+        count = text_lower.count(marker.lower())
+        if count > 0:
+            counts[marker] = count
+
+    return counts
