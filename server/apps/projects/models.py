@@ -27,6 +27,9 @@ class AnalysisRun(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='analysis_runs')
     commit_sha = models.CharField(max_length=40, blank=True, null=True)
+    fingerprint = models.CharField(max_length=64, db_index=True, blank=True, default='')
+    params = models.JSONField(default=dict, blank=True)
+    analyzer_version = models.CharField(max_length=16, default='v1')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
     progress = models.IntegerField(default=0, help_text='0..100')
     error = models.TextField(blank=True, null=True)
@@ -40,6 +43,7 @@ class AnalysisRun(models.Model):
         indexes = [
             models.Index(fields=['project', 'commit_sha']),
             models.Index(fields=['status']),
+            models.Index(fields=['fingerprint']),
         ]
 
     def __str__(self):
@@ -51,11 +55,17 @@ class Artifact(models.Model):
         FACTS = 'facts', 'Facts JSON'
         SCREENSHOT = 'screenshot', 'Screenshot'
         DOCX = 'docx', 'DOCX Document'
+        META = 'meta', 'Meta Info'
+        TRACE = 'trace', 'Trace Info'
+        ERRORS = 'errors', 'Errors Info'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     analysis_run = models.ForeignKey(AnalysisRun, on_delete=models.CASCADE, related_name='artifacts')
     kind = models.CharField(max_length=20, choices=Kind.choices)
-    schema_version = models.CharField(max_length=10, default='v1', help_text='Schema version for forward compatibility')
+    schema_version = models.CharField(max_length=10, default='v1')
+    hash = models.CharField(max_length=64, db_index=True, blank=True, default='')
+    source = models.CharField(max_length=64, blank=True, default='')
+    version = models.CharField(max_length=16, default='v1')
     data = models.JSONField(blank=True, null=True)
     file_path = models.CharField(max_length=500, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -65,6 +75,7 @@ class Artifact(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['kind', 'schema_version']),
+            models.Index(fields=['analysis_run', 'kind', 'hash']),
         ]
 
     def __str__(self):
@@ -88,6 +99,9 @@ class DocumentArtifact(models.Model):
     job_id = models.UUIDField(null=True, blank=True, db_index=True)
     kind = models.CharField(max_length=32, choices=Kind.choices)
     format = models.CharField(max_length=16, choices=Format.choices)
+    hash = models.CharField(max_length=64, db_index=True, blank=True, default='')
+    source = models.CharField(max_length=64, blank=True, default='')
+    version = models.CharField(max_length=16, default='v1')
     data_json = models.JSONField(null=True, blank=True)
     content_text = models.TextField(null=True, blank=True)
     meta = models.JSONField(default=dict, blank=True)
@@ -99,6 +113,7 @@ class DocumentArtifact(models.Model):
         indexes = [
             models.Index(fields=['document', 'kind', 'created_at']),
             models.Index(fields=['section', 'kind', 'created_at']),
+            models.Index(fields=['document', 'kind', 'hash']),
         ]
 
     def __str__(self):

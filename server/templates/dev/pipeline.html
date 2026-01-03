@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline - Dev</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Pipeline Debug</h1>
+        <p class="text-gray-600 mb-6">Analyze repo &rarr; Facts &rarr; Outline &rarr; Sections</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">1. Analyze Repository</h2>
+                <form id="analyzeForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Repository URL</label>
+                        <input type="url" id="repoUrl" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="https://github.com/user/repo" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                        <input type="text" id="branch" value="main" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="forceAnalyze" class="mr-2">
+                        <label for="forceAnalyze" class="text-sm text-gray-700">Force (ignore cache)</label>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+                        Analyze
+                    </button>
+                </form>
+
+                <div id="jobStatus" class="mt-4 hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Status:</span>
+                        <span id="jobStatusBadge" class="px-2 py-1 text-xs rounded-full"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="jobProgress" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+                    <p id="jobId" class="mt-2 text-xs text-gray-500 break-all"></p>
+                    <p id="jobCached" class="text-xs text-green-600 hidden">Cached result</p>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+                <div class="mb-4">
+                    <div class="border-b border-gray-200">
+                        <nav class="flex space-x-4">
+                            <button onclick="showTab('facts')" id="tab-facts" class="tab-btn px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600">Facts</button>
+                            <button onclick="showTab('outline')" id="tab-outline" class="tab-btn px-4 py-2 font-medium text-gray-500">Outline</button>
+                            <button onclick="showTab('sections')" id="tab-sections" class="tab-btn px-4 py-2 font-medium text-gray-500">Sections</button>
+                            <button onclick="showTab('trace')" id="tab-trace" class="tab-btn px-4 py-2 font-medium text-gray-500">Trace</button>
+                        </nav>
+                    </div>
+                </div>
+
+                <div id="content-facts" class="tab-content bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Facts</h2>
+                    </div>
+                    <pre id="factsContent" class="bg-gray-50 p-4 rounded-lg text-xs overflow-auto max-h-96">No data</pre>
+                </div>
+
+                <div id="content-outline" class="tab-content bg-white rounded-lg shadow-md p-6 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Outline</h2>
+                        <button id="generateOutlineBtn" onclick="generateOutline()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:bg-gray-400" disabled>
+                            Generate Outline
+                        </button>
+                    </div>
+                    <pre id="outlineContent" class="bg-gray-50 p-4 rounded-lg text-xs overflow-auto max-h-96">No outline yet</pre>
+                </div>
+
+                <div id="content-sections" class="tab-content bg-white rounded-lg shadow-md p-6 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Sections</h2>
+                    </div>
+                    <div id="sectionsList" class="space-y-3">
+                        <p class="text-gray-500">No document yet</p>
+                    </div>
+                </div>
+
+                <div id="content-trace" class="tab-content bg-white rounded-lg shadow-md p-6 hidden">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Trace / Meta / Errors</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-2">Meta</h3>
+                            <pre id="metaContent" class="bg-gray-50 p-3 rounded-lg text-xs overflow-auto max-h-48">No data</pre>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-2">Trace</h3>
+                            <pre id="traceContent" class="bg-gray-50 p-3 rounded-lg text-xs overflow-auto max-h-48">No data</pre>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-2">Errors</h3>
+                            <pre id="errorsContent" class="bg-red-50 p-3 rounded-lg text-xs overflow-auto max-h-48 text-red-800">No errors</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let currentDocumentId = null;
+        let pollingInterval = null;
+
+        function showTab(name) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                el.classList.add('text-gray-500');
+            });
+            document.getElementById('content-' + name).classList.remove('hidden');
+            const btn = document.getElementById('tab-' + name);
+            btn.classList.remove('text-gray-500');
+            btn.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        }
+
+        function updateStatusBadge(status) {
+            const badge = document.getElementById('jobStatusBadge');
+            const colors = {
+                'queued': 'bg-yellow-100 text-yellow-800',
+                'running': 'bg-blue-100 text-blue-800',
+                'success': 'bg-green-100 text-green-800',
+                'failed': 'bg-red-100 text-red-800'
+            };
+            badge.className = 'px-2 py-1 text-xs rounded-full ' + (colors[status] || 'bg-gray-100');
+            badge.textContent = status;
+        }
+
+        document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const repoUrl = document.getElementById('repoUrl').value;
+            const branch = document.getElementById('branch').value;
+            const force = document.getElementById('forceAnalyze').checked;
+
+            document.getElementById('jobStatus').classList.remove('hidden');
+            document.getElementById('jobCached').classList.add('hidden');
+            updateStatusBadge('queued');
+            document.getElementById('jobProgress').style.width = '0%';
+
+            try {
+                const url = '/api/v1/analyze/' + (force ? '?force=1' : '');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({repo_url: repoUrl, branch: branch})
+                });
+                const data = await res.json();
+                currentJobId = data.job_id;
+                document.getElementById('jobId').textContent = 'Job: ' + currentJobId;
+
+                if (data.cached) {
+                    document.getElementById('jobCached').classList.remove('hidden');
+                }
+
+                if (data.status === 'success') {
+                    updateStatusBadge('success');
+                    document.getElementById('jobProgress').style.width = '100%';
+                    loadArtifacts();
+                } else {
+                    startPolling();
+                }
+            } catch (err) {
+                updateStatusBadge('failed');
+                console.error(err);
+            }
+        });
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(pollJobStatus, 2000);
+        }
+
+        async function pollJobStatus() {
+            if (!currentJobId) return;
+            try {
+                const res = await fetch('/api/v1/jobs/' + currentJobId + '/');
+                const data = await res.json();
+                updateStatusBadge(data.status);
+                document.getElementById('jobProgress').style.width = data.progress + '%';
+
+                if (data.status === 'success' || data.status === 'failed') {
+                    clearInterval(pollingInterval);
+                    loadArtifacts();
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadArtifacts() {
+            if (!currentJobId) return;
+            try {
+                const res = await fetch('/api/v1/jobs/' + currentJobId + '/artifacts/');
+                const data = await res.json();
+
+                const facts = data.artifacts.find(a => a.kind === 'facts');
+                const meta = data.artifacts.find(a => a.kind === 'meta');
+                const trace = data.artifacts.find(a => a.kind === 'trace');
+                const errors = data.artifacts.find(a => a.kind === 'errors');
+
+                document.getElementById('factsContent').textContent = facts ? JSON.stringify(facts.data, null, 2) : 'No facts';
+                document.getElementById('metaContent').textContent = meta ? JSON.stringify(meta.data, null, 2) : 'No meta';
+                document.getElementById('traceContent').textContent = trace ? JSON.stringify(trace.data, null, 2) : 'No trace';
+                document.getElementById('errorsContent').textContent = errors ? JSON.stringify(errors.data, null, 2) : 'No errors';
+
+                document.getElementById('generateOutlineBtn').disabled = !facts;
+
+                await loadDocument();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadDocument() {
+            try {
+                const res = await fetch('/api/v1/jobs/' + currentJobId + '/run/?step=outline', {method: 'POST'});
+                const data = await res.json();
+                if (data.document_id) {
+                    currentDocumentId = data.document_id;
+                    await loadOutline();
+                    await loadSections();
+                }
+            } catch (err) {
+                console.error('No document yet:', err);
+            }
+        }
+
+        async function generateOutline() {
+            if (!currentDocumentId) return;
+            try {
+                document.getElementById('generateOutlineBtn').disabled = true;
+                const res = await fetch('/api/v1/documents/' + currentDocumentId + '/outline/', {method: 'POST'});
+                const data = await res.json();
+                setTimeout(loadOutline, 3000);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadOutline() {
+            if (!currentDocumentId) return;
+            try {
+                const res = await fetch('/api/v1/documents/' + currentDocumentId + '/outline/');
+                const data = await res.json();
+                document.getElementById('outlineContent').textContent = data.outline ? JSON.stringify(data.outline, null, 2) : 'No outline yet';
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadSections() {
+            if (!currentDocumentId) return;
+            try {
+                const res = await fetch('/api/v1/documents/' + currentDocumentId + '/sections/');
+                const sections = await res.json();
+                const container = document.getElementById('sectionsList');
+                container.innerHTML = sections.map(s => `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <span class="font-medium">${s.title}</span>
+                            <span class="text-xs text-gray-500 ml-2">${s.key}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(s.status)}">${s.status}</span>
+                            <button onclick="generateSection('${s.key}')" class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700" ${s.status === 'running' || s.status === 'queued' ? 'disabled' : ''}>
+                                Generate
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'idle': 'bg-gray-100 text-gray-800',
+                'queued': 'bg-yellow-100 text-yellow-800',
+                'running': 'bg-blue-100 text-blue-800',
+                'success': 'bg-green-100 text-green-800',
+                'failed': 'bg-red-100 text-red-800'
+            };
+            return colors[status] || 'bg-gray-100';
+        }
+
+        async function generateSection(key) {
+            if (!currentDocumentId) return;
+            try {
+                await fetch('/api/v1/documents/' + currentDocumentId + '/sections/' + key + '/generate/', {method: 'POST'});
+                setTimeout(loadSections, 2000);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>

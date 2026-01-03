@@ -1,3 +1,7 @@
+import hashlib
+import json
+
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -17,15 +21,36 @@ from .serializers import (
     SectionDetailSerializer,
     JobIdResponseSerializer,
 )
+from services.analyzer.constants import ANALYZER_VERSION
 from services.documents import DocumentService, SectionBusy
 from tasks.analyzer_tasks import run_analysis
+
+
+def _make_analysis_fingerprint(repo_url: str, branch: str, params: dict) -> str:
+    data = {
+        'repo_url': repo_url,
+        'branch': branch,
+        'analyzer_version': ANALYZER_VERSION,
+        'params': params,
+    }
+    raw = json.dumps(data, sort_keys=True)
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 @extend_schema(
     request=AnalyzeRequestSerializer,
     responses={202: JobCreateResponseSerializer},
+    parameters=[
+        OpenApiParameter(
+            name='force',
+            description='Force new analysis, ignore cache',
+            required=False,
+            type=bool
+        )
+    ],
     description="Создаёт задачу анализа репозитория и возвращает job_id. "
-                "Если уже есть успешный анализ для того же repo — возвращает существующий job.",
+                "Если уже есть успешный анализ с тем же fingerprint — возвращает существующий job. "
+                "?force=1 игнорирует кеш.",
     tags=["Analysis"]
 )
 @api_view(['POST'])
@@ -39,30 +64,39 @@ def create_analysis(request):
 
     repo_url = serializer.validated_data['repo_url']
     branch = serializer.validated_data.get('branch', 'main')
+    force = request.query_params.get('force', '').lower() in ('1', 'true', 'yes')
+
+    params = {'branch': branch}
+    fingerprint = _make_analysis_fingerprint(repo_url, branch, params)
 
     project, _ = Project.objects.get_or_create(
         repo_url=repo_url,
         defaults={'default_branch': branch}
     )
 
-    existing_run = AnalysisRun.objects.filter(
-        project=project,
-        status=AnalysisRun.Status.SUCCESS
-    ).order_by('-created_at').first()
+    if not force:
+        existing_run = AnalysisRun.objects.filter(
+            fingerprint=fingerprint,
+            status=AnalysisRun.Status.SUCCESS
+        ).order_by('-created_at').first()
 
-    if existing_run:
-        return Response(
-            {
-                "job_id": existing_run.id,
-                "project_id": project.id,
-                "status": existing_run.status,
-                "message": "Returning cached analysis result"
-            },
-            status=status.HTTP_200_OK
-        )
+        if existing_run:
+            return Response(
+                {
+                    "job_id": existing_run.id,
+                    "project_id": project.id,
+                    "status": existing_run.status,
+                    "message": "Returning cached analysis result",
+                    "cached": True
+                },
+                status=status.HTTP_200_OK
+            )
 
     analysis_run = AnalysisRun.objects.create(
         project=project,
+        fingerprint=fingerprint,
+        params=params,
+        analyzer_version=ANALYZER_VERSION,
         status=AnalysisRun.Status.QUEUED
     )
 
@@ -73,7 +107,8 @@ def create_analysis(request):
             "job_id": analysis_run.id,
             "project_id": project.id,
             "status": analysis_run.status,
-            "message": "Analysis job created"
+            "message": "Analysis job created",
+            "cached": False
         },
         status=status.HTTP_202_ACCEPTED
     )
@@ -156,6 +191,103 @@ def get_job_artifacts(request, job_id):
         "artifacts": serializer.data,
         "error": None
     })
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name='step',
+            description='Step to run: extract, outline, section',
+            required=True,
+            type=str,
+            enum=['extract', 'outline', 'section']
+        ),
+        OpenApiParameter(
+            name='key',
+            description='Section key (required for step=section)',
+            required=False,
+            type=str
+        )
+    ],
+    responses={202: JobIdResponseSerializer},
+    description="[DEV] Запустить отдельный шаг пайплайна. "
+                "step=extract: перезапуск анализа. "
+                "step=outline: генерация outline (нужен Document). "
+                "step=section: генерация секции (key обязателен).",
+    tags=["Analysis"]
+)
+@api_view(['POST'])
+def run_step(request, job_id):
+    if not settings.DEBUG:
+        return Response(
+            {"error": "This endpoint is only available in DEBUG mode"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        analysis_run = AnalysisRun.objects.get(id=job_id)
+    except AnalysisRun.DoesNotExist:
+        return Response(
+            {"error": "Job not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    step = request.query_params.get('step')
+    if not step:
+        return Response(
+            {"error": "step parameter is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if step == 'extract':
+        run_analysis.delay(str(job_id), analysis_run.project.repo_url)
+        return Response(
+            {"queued": True, "step": step, "job_id": str(job_id)},
+            status=status.HTTP_202_ACCEPTED
+        )
+
+    if step == 'outline':
+        doc = analysis_run.documents.first()
+        if not doc:
+            service = DocumentService()
+            doc = service.create_document(str(job_id))
+
+        service = DocumentService()
+        outline_job_id = service.request_outline(str(doc.id))
+        return Response(
+            {"queued": True, "step": step, "job_id": outline_job_id, "document_id": str(doc.id)},
+            status=status.HTTP_202_ACCEPTED
+        )
+
+    if step == 'section':
+        key = request.query_params.get('key')
+        if not key:
+            return Response(
+                {"error": "key parameter is required for step=section"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        doc = analysis_run.documents.first()
+        if not doc:
+            return Response(
+                {"error": "No document found. Run step=outline first."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            service = DocumentService()
+            section_job_id = service.request_section_generate(str(doc.id), key)
+            return Response(
+                {"queued": True, "step": step, "key": key, "job_id": section_job_id},
+                status=status.HTTP_202_ACCEPTED
+            )
+        except SectionBusy as e:
+            return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
+
+    return Response(
+        {"error": f"Unknown step: {step}"},
+        status=status.HTTP_400_BAD_REQUEST
+    )
 
 
 @extend_schema(
