@@ -11,7 +11,7 @@ from .schema import (
 from . import prompts
 
 
-async def build_glossary(
+def build_glossary(
     llm_client: LLMClient,
     term_candidates: list[str],
     sections: list[dict],
@@ -24,14 +24,13 @@ async def build_glossary(
         text_excerpts=text_excerpts,
     )
 
-    result = await llm_client.generate_json(
-        system_prompt=prompts.GLOSSARY_SYSTEM,
-        user_prompt=user_prompt,
+    result = llm_client.generate_json(
+        system=prompts.GLOSSARY_SYSTEM,
+        user=user_prompt,
         schema=_GLOSSARY_SCHEMA,
-        idempotency_key=idempotency_key,
     )
 
-    return _parse_glossary(result.content)
+    return _parse_glossary(result.data)
 
 
 def _extract_term_excerpts(candidates: list[str], sections: list[dict]) -> str:

@@ -11,7 +11,7 @@ from .schema import (
 from . import prompts
 
 
-async def create_edit_plan(
+def create_edit_plan(
     llm_client: LLMClient,
     outline: dict,
     section_summaries: list[dict],
@@ -28,14 +28,13 @@ async def create_edit_plan(
         level=level,
     )
 
-    result = await llm_client.generate_json(
-        system_prompt=prompts.EDIT_PLAN_SYSTEM,
-        user_prompt=user_prompt,
+    result = llm_client.generate_json(
+        system=prompts.EDIT_PLAN_SYSTEM,
+        user=user_prompt,
         schema=_EDIT_PLAN_SCHEMA,
-        idempotency_key=idempotency_key,
     )
 
-    return _parse_edit_plan(result.content, level)
+    return _parse_edit_plan(result.data, level)
 
 
 def _quality_report_to_metrics(report: QualityReport) -> dict:

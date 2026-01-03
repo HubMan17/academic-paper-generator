@@ -22,8 +22,6 @@ from services.pipeline.tasks import run_document_task, run_section_task, resume_
 from services.editor import (
     EditorService,
     EditLevel,
-    analyze_document,
-    quality_report_to_dict,
 )
 
 
@@ -303,16 +301,7 @@ def run_pipeline_sync(request, document_id):
 
     if step == 'analyze':
         service = EditorService()
-        sections = service._get_sections_data(doc)
-        quality_report = analyze_document(sections)
-
-        artifact = DocumentArtifact.objects.create(
-            document=doc,
-            kind=DocumentArtifact.Kind.QUALITY_REPORT,
-            format=DocumentArtifact.Format.JSON,
-            data_json=quality_report_to_dict(quality_report),
-            version='v1',
-        )
+        quality_report, artifact = service.run_analyze_only(doc)
 
         return Response({
             'success': True,

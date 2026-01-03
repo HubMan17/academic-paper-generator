@@ -92,6 +92,7 @@ class DocumentArtifact(models.Model):
         LLM_TRACE = 'llm_trace', 'LLM Call Trace'
         EDIT_PLAN = 'edit_plan', 'Edit Plan'
         QUALITY_REPORT = 'quality_report', 'Quality Report'
+        EDIT_QUALITY_REPORT = 'edit_quality_report', 'Edit Quality Report'
         GLOSSARY = 'glossary', 'Glossary'
         CONSISTENCY_REPORT = 'consistency_report', 'Consistency Report'
         CHAPTER_CONCLUSIONS = 'chapter_conclusions', 'Chapter Conclusions'

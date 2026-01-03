@@ -5,7 +5,7 @@ from .schema import ChapterConclusion
 from . import prompts
 
 
-async def generate_chapter_conclusions(
+def generate_chapter_conclusions(
     llm_client: LLMClient,
     outline: dict,
     section_summaries: list[dict],
@@ -37,7 +37,7 @@ async def generate_chapter_conclusions(
         if idempotency_prefix:
             idempotency_key = f"{idempotency_prefix}:conclusion:{chapter_key}"
 
-        conclusion = await _generate_chapter_conclusion(
+        conclusion = _generate_chapter_conclusion(
             llm_client=llm_client,
             chapter_key=chapter_key,
             chapter_title=chapter_title,
@@ -51,7 +51,7 @@ async def generate_chapter_conclusions(
     return conclusions
 
 
-async def _generate_chapter_conclusion(
+def _generate_chapter_conclusion(
     llm_client: LLMClient,
     chapter_key: str,
     chapter_title: str,
@@ -63,14 +63,13 @@ async def _generate_chapter_conclusion(
         section_summaries=section_summaries,
     )
 
-    result = await llm_client.generate_json(
-        system_prompt=prompts.CHAPTER_CONCLUSION_SYSTEM,
-        user_prompt=user_prompt,
+    result = llm_client.generate_json(
+        system=prompts.CHAPTER_CONCLUSION_SYSTEM,
+        user=user_prompt,
         schema=_CONCLUSION_SCHEMA,
-        idempotency_key=idempotency_key,
     )
 
-    bullets = result.content.get("bullets", [])
+    bullets = result.data.get("bullets", [])
 
     if not bullets:
         return None
@@ -82,7 +81,7 @@ async def _generate_chapter_conclusion(
     )
 
 
-async def generate_final_conclusion(
+def generate_final_conclusion(
     llm_client: LLMClient,
     document_title: str,
     chapter_conclusions: list[ChapterConclusion],
@@ -103,14 +102,13 @@ async def generate_final_conclusion(
         original_conclusion=original_conclusion,
     )
 
-    result = await llm_client.generate_text(
-        system_prompt=prompts.FINAL_CONCLUSION_SYSTEM,
-        user_prompt=user_prompt,
+    result = llm_client.generate_text(
+        system=prompts.FINAL_CONCLUSION_SYSTEM,
+        user=user_prompt,
         max_tokens=2000,
-        idempotency_key=idempotency_key,
     )
 
-    return result.content.strip()
+    return result.text.strip()
 
 
 def chapter_conclusions_to_dict(conclusions: list[ChapterConclusion]) -> dict:
