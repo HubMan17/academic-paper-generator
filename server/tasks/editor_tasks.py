@@ -1,7 +1,7 @@
-import asyncio
 import time
 import uuid
 
+from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.utils import timezone
 
@@ -45,12 +45,10 @@ def run_editor_pipeline_task(
         service = EditorService()
         edit_level = EditLevel(level)
 
-        result = asyncio.run(
-            service.run_full_pipeline(
-                document_id=uuid.UUID(document_id),
-                level=edit_level,
-                force=force,
-            )
+        result = async_to_sync(service.run_full_pipeline)(
+            document_id=uuid.UUID(document_id),
+            level=edit_level,
+            force=force,
         )
 
         steps.append({
