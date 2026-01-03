@@ -26,21 +26,35 @@ def _extract_facts_from_analyzer(facts: dict[str, Any]) -> list[dict[str, Any]]:
         })
 
     for i, lang in enumerate(facts.get("languages", [])):
+        if isinstance(lang, str):
+            lang_name = lang
+            lang_ratio = ""
+            lang_loc = ""
+        else:
+            lang_name = lang.get('name', 'unknown')
+            lang_ratio = f" ({lang.get('ratio', 0):.0%})"
+            lang_loc = f"{lang.get('lines_of_code', 0)} lines of code"
         extracted.append({
             "id": f"lang_{i}",
             "tags": ["tech_stack", "languages", "purpose"],
-            "key_path": f"languages.{lang.get('name', 'unknown')}",
-            "text": f"Language: {lang.get('name', 'unknown')} ({lang.get('ratio', 0):.0%})",
-            "details": f"{lang.get('lines_of_code', 0)} lines of code"
+            "key_path": f"languages.{lang_name}",
+            "text": f"Language: {lang_name}{lang_ratio}",
+            "details": lang_loc or lang_name
         })
 
     for i, fw in enumerate(facts.get("frameworks", [])):
+        if isinstance(fw, str):
+            fw_name = fw
+            fw_type = ""
+        else:
+            fw_name = fw.get('name', 'unknown')
+            fw_type = fw.get('type', 'unknown')
         extracted.append({
             "id": f"fw_{i}",
             "tags": ["tech_stack", "frameworks", "purpose"],
-            "key_path": f"frameworks.{fw.get('name', 'unknown')}",
-            "text": f"Framework: {fw.get('name', 'unknown')} ({fw.get('type', 'unknown')})",
-            "details": f"Type: {fw.get('type', 'unknown')}"
+            "key_path": f"frameworks.{fw_name}",
+            "text": f"Framework: {fw_name}" + (f" ({fw_type})" if fw_type else ""),
+            "details": f"Type: {fw_type}" if fw_type else fw_name
         })
 
     arch = facts.get("architecture")
