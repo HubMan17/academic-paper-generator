@@ -49,7 +49,7 @@ class JobStatusSerializer(serializers.ModelSerializer):
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Section
-        fields = ['id', 'key', 'title', 'order', 'status', 'content', 'summary', 'version']
+        fields = ['id', 'key', 'title', 'order', 'status', 'text_current', 'summary_current', 'version']
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -64,3 +64,42 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ['id', 'repo_url', 'default_branch', 'created_at']
+
+
+class DocumentCreateSerializer(serializers.Serializer):
+    analysis_run_id = serializers.UUIDField()
+    params = serializers.JSONField(required=False, default=dict)
+    doc_type = serializers.ChoiceField(choices=['course', 'diploma'], default='course')
+    language = serializers.CharField(default='ru-RU')
+    target_pages = serializers.IntegerField(default=40)
+
+
+class DocumentResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = ['id', 'analysis_run', 'type', 'language', 'target_pages', 'params', 'status', 'created_at']
+
+
+class OutlineResponseSerializer(serializers.Serializer):
+    outline = serializers.JSONField(allow_null=True)
+    artifact_id = serializers.UUIDField(allow_null=True)
+
+
+class SectionListSerializer(serializers.ModelSerializer):
+    last_artifact_id = serializers.UUIDField(source='last_artifact.id', allow_null=True, read_only=True)
+
+    class Meta:
+        model = Section
+        fields = ['key', 'title', 'order', 'status', 'version', 'last_artifact_id']
+
+
+class SectionDetailSerializer(serializers.ModelSerializer):
+    last_artifact_id = serializers.UUIDField(source='last_artifact.id', allow_null=True, read_only=True)
+
+    class Meta:
+        model = Section
+        fields = ['key', 'title', 'order', 'status', 'version', 'text_current', 'summary_current', 'last_artifact_id', 'last_error']
+
+
+class JobIdResponseSerializer(serializers.Serializer):
+    job_id = serializers.UUIDField()
