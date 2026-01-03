@@ -265,3 +265,7 @@ def prompting_slice_api(request):
             {"status": "error", "error": str(e), "context_pack": None},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+def test_pipeline_page(request):
+    return render(request, 'core/test_pipeline.html')
