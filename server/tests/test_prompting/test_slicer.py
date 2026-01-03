@@ -32,6 +32,54 @@ def sample_facts():
 
 
 @pytest.fixture
+def analyzer_facts():
+    return {
+        "schema": "facts/v1",
+        "repo": {
+            "url": "https://github.com/test/repo",
+            "commit": "abc123",
+            "detected_at": "2025-01-01T00:00:00Z"
+        },
+        "languages": [
+            {"name": "Python", "ratio": 0.7, "lines_of_code": 5000, "evidence": []},
+            {"name": "JavaScript", "ratio": 0.3, "lines_of_code": 2000, "evidence": []}
+        ],
+        "frameworks": [
+            {"name": "Django", "type": "backend", "evidence": []},
+            {"name": "React", "type": "frontend", "evidence": []}
+        ],
+        "architecture": {
+            "type": "layered",
+            "confidence": 0.85,
+            "evidence": ["apps/", "services/", "api/"]
+        },
+        "modules": [
+            {"name": "apps", "role": "applications", "path": "apps/", "submodules": ["core", "auth"], "evidence": []},
+            {"name": "services", "role": "business_logic", "path": "services/", "submodules": ["llm"], "evidence": []}
+        ],
+        "api": {
+            "endpoints": [
+                {"method": "GET", "path": "/users", "full_path": "/api/v1/users", "handler": "list_users", "router": "api", "file": "views.py", "tags": [], "auth_required": True, "description": "List users"},
+                {"method": "POST", "path": "/auth/login", "full_path": "/api/v1/auth/login", "handler": "login", "router": "auth", "file": "auth.py", "tags": [], "auth_required": False, "description": "Login"}
+            ],
+            "total_count": 2
+        },
+        "frontend_routes": [],
+        "models": [
+            {"name": "User", "table": "users", "fields": ["id", "email", "name"], "relationships": [], "file": "models.py"}
+        ],
+        "runtime": {
+            "dependencies": [
+                {"name": "django", "version": "5.0", "evidence": []},
+                {"name": "djangorestframework", "version": "3.14", "evidence": []}
+            ],
+            "build_files": ["Dockerfile", "docker-compose.yml"],
+            "entrypoints": ["manage.py"]
+        }
+    }
+
+
+@pytest.fixture
 def sample_outline():
     return {
         "title": "Test Document",
@@ -134,3 +182,60 @@ def test_context_pack_structure(sample_facts, sample_outline):
     assert hasattr(context_pack.debug, 'selected_fact_refs')
     assert hasattr(context_pack.debug, 'selection_reason')
     assert hasattr(context_pack.debug, 'trims_applied')
+
+
+def test_slice_analyzer_facts_intro(analyzer_facts, sample_outline):
+    context_pack = slice_for_section(
+        section_key="intro",
+        facts=analyzer_facts,
+        outline=sample_outline,
+        summaries=[],
+        global_context="Test project"
+    )
+
+    assert context_pack.section_key == "intro"
+    assert len(context_pack.debug.selected_fact_refs) > 0
+
+    has_tech_stack = any(
+        "tech_stack" in ref.reason
+        for ref in context_pack.debug.selected_fact_refs
+    )
+    assert has_tech_stack
+
+
+def test_slice_analyzer_facts_architecture(analyzer_facts, sample_outline):
+    context_pack = slice_for_section(
+        section_key="architecture",
+        facts=analyzer_facts,
+        outline=sample_outline,
+        summaries=[],
+        global_context="Test project"
+    )
+
+    assert context_pack.section_key == "architecture"
+    assert len(context_pack.debug.selected_fact_refs) > 0
+
+    has_architecture = any(
+        "architecture" in ref.reason or "modules" in ref.reason
+        for ref in context_pack.debug.selected_fact_refs
+    )
+    assert has_architecture
+
+
+def test_slice_analyzer_facts_api(analyzer_facts, sample_outline):
+    context_pack = slice_for_section(
+        section_key="api",
+        facts=analyzer_facts,
+        outline=sample_outline,
+        summaries=[],
+        global_context="Test project"
+    )
+
+    assert context_pack.section_key == "api"
+    assert len(context_pack.debug.selected_fact_refs) > 0
+
+    has_api = any(
+        "api" in ref.reason or "endpoints" in ref.reason
+        for ref in context_pack.debug.selected_fact_refs
+    )
+    assert has_api
