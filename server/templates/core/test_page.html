@@ -20,6 +20,9 @@
                     <button onclick="showTab('analyzer')" id="tab-analyzer" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
                         Analyzer
                     </button>
+                    <button onclick="showTab('context')" id="tab-context" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
+                        Context Pack
+                    </button>
                     <button onclick="showTab('stats')" id="tab-stats" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
                         Статистика
                     </button>
@@ -191,6 +194,140 @@
                         <summary class="text-blue-600 hover:text-blue-800 cursor-pointer mb-2">Показать JSON</summary>
                         <pre id="factsOutput" class="bg-gray-50 p-4 rounded-lg overflow-x-auto text-sm max-h-96 overflow-y-auto"></pre>
                     </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- Context Pack Tab -->
+        <div id="content-context" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Input -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Context Pack Builder</h2>
+                    <p class="text-sm text-gray-600 mb-4">Тестирование slice_for_section() - выборка фактов и сборка контекста для секции</p>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Section Key</label>
+                            <select id="sectionKey" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="intro">intro - Введение</option>
+                                <option value="architecture">architecture - Архитектура</option>
+                                <option value="api">api - API</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Facts JSON</label>
+                            <textarea id="factsInput" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm font-mono" placeholder='{"facts": [{"id": "...", "tags": [...], "text": "..."}]}'></textarea>
+                            <div class="mt-1 flex space-x-2">
+                                <button onclick="loadSampleFacts()" class="text-xs text-purple-600 hover:text-purple-800">Загрузить пример</button>
+                                <button onclick="loadFromAnalyzer()" class="text-xs text-blue-600 hover:text-blue-800">Из Analyzer</button>
+                                <label class="text-xs text-green-600 hover:text-green-800 cursor-pointer">
+                                    <input type="file" id="factsFile" accept=".json" class="hidden" onchange="loadFactsFile(event)">
+                                    Загрузить файл
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Outline JSON (опционально)</label>
+                            <textarea id="outlineInput" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm font-mono" placeholder='{"sections": [...]}'></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Global Context</label>
+                            <input type="text" id="globalContext" value="Проект: Test App" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+
+                        <button onclick="buildContextPack()" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors">
+                            Build Context Pack
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Output -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Result</h2>
+
+                    <div id="contextResult" class="hidden space-y-4">
+                        <!-- Debug Info -->
+                        <div class="bg-purple-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-purple-800 mb-2">Debug Info</h3>
+                            <div class="text-sm">
+                                <p><span class="font-medium">Selected facts:</span> <span id="selectedFactsCount">0</span></p>
+                                <p><span class="font-medium">Trims applied:</span> <span id="trimsApplied">none</span></p>
+                                <p><span class="font-medium">Reason:</span> <span id="selectionReason">-</span></p>
+                            </div>
+                            <details class="mt-2">
+                                <summary class="text-purple-600 hover:text-purple-800 cursor-pointer text-xs">Fact refs</summary>
+                                <pre id="factRefs" class="bg-white p-2 rounded text-xs mt-1 max-h-32 overflow-y-auto"></pre>
+                            </details>
+                        </div>
+
+                        <!-- Budget -->
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-blue-800 mb-2">Budget</h3>
+                            <div class="grid grid-cols-3 gap-2 text-sm">
+                                <div>
+                                    <p class="text-xs text-gray-600">Input tokens</p>
+                                    <p id="budgetInput" class="font-bold">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-600">Output tokens</p>
+                                    <p id="budgetOutput" class="font-bold">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-600">Char limit</p>
+                                    <p id="budgetChars" class="font-bold">-</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Layers -->
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Layers</h3>
+                            <div class="space-y-2">
+                                <details>
+                                    <summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-800">Global Context (<span id="layerGlobalLen">0</span> chars)</summary>
+                                    <pre id="layerGlobal" class="bg-gray-50 p-2 rounded text-xs mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap"></pre>
+                                </details>
+                                <details>
+                                    <summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-800">Outline Excerpt (<span id="layerOutlineLen">0</span> chars)</summary>
+                                    <pre id="layerOutline" class="bg-gray-50 p-2 rounded text-xs mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap"></pre>
+                                </details>
+                                <details>
+                                    <summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-800">Facts Slice (<span id="layerFactsLen">0</span> chars)</summary>
+                                    <pre id="layerFacts" class="bg-gray-50 p-2 rounded text-xs mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap"></pre>
+                                </details>
+                                <details>
+                                    <summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-800">Constraints (<span id="layerConstraintsLen">0</span> chars)</summary>
+                                    <pre id="layerConstraints" class="bg-gray-50 p-2 rounded text-xs mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap"></pre>
+                                </details>
+                            </div>
+                        </div>
+
+                        <!-- Rendered Prompt -->
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Rendered Prompt</h3>
+                            <details>
+                                <summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-800">System (<span id="promptSystemLen">0</span> chars)</summary>
+                                <pre id="promptSystem" class="bg-yellow-50 p-2 rounded text-xs mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap"></pre>
+                            </details>
+                            <details class="mt-2">
+                                <summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-800">User (<span id="promptUserLen">0</span> chars)</summary>
+                                <pre id="promptUser" class="bg-green-50 p-2 rounded text-xs mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap"></pre>
+                            </details>
+                        </div>
+                    </div>
+
+                    <div id="contextEmpty" class="text-center py-12 text-gray-500">
+                        <p>Нажмите "Build Context Pack" для генерации</p>
+                    </div>
+
+                    <div id="contextError" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h3 class="text-red-800 font-semibold mb-1">Error</h3>
+                        <p id="contextErrorMessage" class="text-red-600 text-sm"></p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -477,6 +614,111 @@
             } catch (err) {
                 alert('Failed to clear cache: ' + err.message);
             }
+        }
+
+        // Context Pack functions
+        async function buildContextPack() {
+            document.getElementById('contextError').classList.add('hidden');
+            document.getElementById('contextResult').classList.add('hidden');
+            document.getElementById('contextEmpty').classList.add('hidden');
+
+            try {
+                const factsText = document.getElementById('factsInput').value.trim();
+                const outlineText = document.getElementById('outlineInput').value.trim();
+
+                if (!factsText) {
+                    throw new Error('Facts JSON is required');
+                }
+
+                const facts = JSON.parse(factsText);
+                const outline = outlineText ? JSON.parse(outlineText) : {};
+                const sectionKey = document.getElementById('sectionKey').value;
+                const globalContext = document.getElementById('globalContext').value;
+
+                const response = await fetch('/api/v1/prompting/slice/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        section_key: sectionKey,
+                        facts: facts,
+                        outline: outline,
+                        global_context: globalContext,
+                        summaries: []
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayContextPack(data.context_pack);
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (err) {
+                document.getElementById('contextErrorMessage').textContent = err.message;
+                document.getElementById('contextError').classList.remove('hidden');
+            }
+        }
+
+        function displayContextPack(pack) {
+            document.getElementById('selectedFactsCount').textContent = pack.debug.selected_fact_refs.length;
+            document.getElementById('trimsApplied').textContent = pack.debug.trims_applied.length > 0 ? pack.debug.trims_applied.join(', ') : 'none';
+            document.getElementById('selectionReason').textContent = pack.debug.selection_reason;
+            document.getElementById('factRefs').textContent = JSON.stringify(pack.debug.selected_fact_refs, null, 2);
+
+            document.getElementById('budgetInput').textContent = pack.budget.max_input_tokens_approx;
+            document.getElementById('budgetOutput').textContent = pack.budget.max_output_tokens;
+            document.getElementById('budgetChars').textContent = pack.budget.soft_char_limit;
+
+            document.getElementById('layerGlobal').textContent = pack.layers.global_context;
+            document.getElementById('layerGlobalLen').textContent = pack.layers.global_context.length;
+            document.getElementById('layerOutline').textContent = pack.layers.outline_excerpt;
+            document.getElementById('layerOutlineLen').textContent = pack.layers.outline_excerpt.length;
+            document.getElementById('layerFacts').textContent = pack.layers.facts_slice;
+            document.getElementById('layerFactsLen').textContent = pack.layers.facts_slice.length;
+            document.getElementById('layerConstraints').textContent = pack.layers.constraints;
+            document.getElementById('layerConstraintsLen').textContent = pack.layers.constraints.length;
+
+            document.getElementById('promptSystem').textContent = pack.rendered_prompt.system;
+            document.getElementById('promptSystemLen').textContent = pack.rendered_prompt.system.length;
+            document.getElementById('promptUser').textContent = pack.rendered_prompt.user;
+            document.getElementById('promptUserLen').textContent = pack.rendered_prompt.user.length;
+
+            document.getElementById('contextResult').classList.remove('hidden');
+        }
+
+        function loadSampleFacts() {
+            const sample = {
+                "facts": [
+                    {"id": "f1", "tags": ["project_name", "description"], "key_path": "project.name", "text": "Project: Academic Paper Generator", "details": "A tool for generating academic papers from code repositories"},
+                    {"id": "f2", "tags": ["tech_stack"], "key_path": "tech.backend", "text": "Backend: Django 5 + DRF", "details": "Python backend with Django REST Framework"},
+                    {"id": "f3", "tags": ["tech_stack"], "key_path": "tech.frontend", "text": "Frontend: React + TypeScript", "details": "SPA with TailwindCSS"},
+                    {"id": "f4", "tags": ["architecture"], "key_path": "arch.pattern", "text": "Architecture: Layered MVC", "details": "Services layer, Django apps, React components"},
+                    {"id": "f5", "tags": ["api", "endpoints"], "key_path": "api.main", "text": "API: REST endpoints", "details": "/api/v1/analyzer/, /api/v1/llm/"},
+                    {"id": "f6", "tags": ["modules"], "key_path": "modules.analyzer", "text": "Module: Repo Analyzer", "details": "Analyzes Git repositories and extracts facts"},
+                    {"id": "f7", "tags": ["modules"], "key_path": "modules.llm", "text": "Module: LLM Client", "details": "OpenAI integration with caching"}
+                ]
+            };
+            document.getElementById('factsInput').value = JSON.stringify(sample, null, 2);
+        }
+
+        function loadFromAnalyzer() {
+            if (factsData) {
+                document.getElementById('factsInput').value = JSON.stringify(factsData, null, 2);
+            } else {
+                alert('Сначала выполните анализ репозитория во вкладке Analyzer');
+            }
+        }
+
+        function loadFactsFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('factsInput').value = e.target.result;
+            };
+            reader.readAsText(file);
         }
     </script>
 </body>
