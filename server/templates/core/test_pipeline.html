@@ -5,110 +5,158 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipeline Test - Academic Paper Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .prose h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .prose h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; }
+        .prose p { margin-bottom: 0.75rem; line-height: 1.6; }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-6xl">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Document Pipeline Test</h1>
-        <p class="text-gray-600 mb-6">Этап 4: генерация документа с секциями</p>
+    <div class="container mx-auto px-4 py-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-1">Document Pipeline Test</h1>
+        <p class="text-gray-600 mb-4 text-sm">Этап 4-5: генерация и редактура документа</p>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Controls -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Controls</h2>
+        <div class="grid grid-cols-12 gap-4" style="height: calc(100vh - 120px);">
+            <!-- Left Panel: Controls + Sections -->
+            <div class="col-span-4 flex flex-col gap-4 overflow-y-auto">
+                <!-- Controls -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3">Controls</h2>
 
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Document ID</label>
-                        <input type="text" id="documentId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="UUID">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Document ID</label>
+                            <input type="text" id="documentId" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono" placeholder="UUID">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Profile</label>
+                                <select id="profileSelect" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                    <option value="fast">fast</option>
+                                    <option value="default">default</option>
+                                    <option value="heavy" selected>heavy</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Edit Level</label>
+                                <select id="editLevelSelect" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                    <option value="1" selected>Level 1</option>
+                                    <option value="2">Level 2</option>
+                                    <option value="3">Level 3 (ВУЗ)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="runDocumentSync()" class="bg-blue-600 text-white py-1.5 px-3 rounded text-xs hover:bg-blue-700">
+                                Generate
+                            </button>
+                            <button onclick="runEditSync()" class="bg-purple-600 text-white py-1.5 px-3 rounded text-xs hover:bg-purple-700">
+                                Edit
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="loadStatus()" class="bg-gray-500 text-white py-1.5 px-3 rounded text-xs hover:bg-gray-600">
+                                Refresh
+                            </button>
+                            <button onclick="createTestDocument()" class="bg-green-600 text-white py-1.5 px-3 rounded text-xs hover:bg-green-700">
+                                Create Test
+                            </button>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Profile</label>
-                        <select id="profileSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                            <option value="fast">fast</option>
-                            <option value="default" selected>default</option>
-                            <option value="heavy">heavy</option>
-                        </select>
+                    <div id="statusInfo" class="mt-3 text-xs border-t pt-2">
+                        <p class="text-gray-500">Click "Create Test" to start</p>
                     </div>
-
-                    <div class="flex space-x-2">
-                        <button onclick="runDocument()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm" title="Requires Celery + Redis">
-                            Run (Celery)
-                        </button>
-                        <button onclick="runDocumentSync()" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 text-sm" title="Synchronous, no Celery needed">
-                            Run Sync
-                        </button>
-                    </div>
-
-                    <button onclick="loadStatus()" class="w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 text-sm">
-                        Refresh Status
-                    </button>
-
-                    <button onclick="createTestDocument()" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 text-sm">
-                        Create Test Document
-                    </button>
                 </div>
 
-                <div id="statusInfo" class="mt-4 text-sm">
-                    <p class="text-gray-500">Click "Create Test Document" to start</p>
-                </div>
-            </div>
+                <!-- Sections Table -->
+                <div class="bg-white rounded-lg shadow-md p-4 flex-1 overflow-y-auto">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3">Sections</h2>
 
-            <!-- Sections Table -->
-            <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Sections</h2>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-xs">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-3 py-2 text-left">Key</th>
-                                <th class="px-3 py-2 text-left">Title</th>
-                                <th class="px-3 py-2 text-center">Context</th>
-                                <th class="px-3 py-2 text-center">Section</th>
-                                <th class="px-3 py-2 text-center">Summary</th>
-                                <th class="px-3 py-2 text-center">Actions</th>
+                                <th class="px-2 py-1.5 text-left">Key</th>
+                                <th class="px-2 py-1.5 text-left">Title</th>
+                                <th class="px-2 py-1.5 text-center" title="Context Pack">C</th>
+                                <th class="px-2 py-1.5 text-center" title="Section Text">S</th>
+                                <th class="px-2 py-1.5 text-center" title="Summary">Σ</th>
+                                <th class="px-2 py-1.5 text-center" title="Edited">E</th>
+                                <th class="px-2 py-1.5"></th>
                             </tr>
                         </thead>
                         <tbody id="sectionsTable" class="divide-y">
-                            <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">No data</td></tr>
+                            <tr><td colspan="7" class="px-2 py-3 text-center text-gray-500">No data</td></tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
 
-        <!-- Results Tabs -->
-        <div class="mt-6 bg-white rounded-lg shadow-md p-6">
-            <div class="border-b border-gray-200 mb-4">
-                <nav class="flex space-x-4">
-                    <button onclick="showResultTab('draft')" id="rtab-draft" class="result-tab px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600">
-                        Document Draft
-                    </button>
-                    <button onclick="showResultTab('toc')" id="rtab-toc" class="result-tab px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
-                        TOC
-                    </button>
-                    <button onclick="showResultTab('quality')" id="rtab-quality" class="result-tab px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
-                        Quality Report
-                    </button>
-                </nav>
-            </div>
-
-            <div id="result-draft" class="result-content">
-                <div id="draftContent" class="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
-                    <p class="text-gray-500 text-sm">No document draft yet</p>
+                <!-- Edit Artifacts -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3">Edit Artifacts</h2>
+                    <div id="editArtifacts" class="text-xs space-y-1">
+                        <p class="text-gray-500">No edit artifacts</p>
+                    </div>
                 </div>
             </div>
 
-            <div id="result-toc" class="result-content hidden">
-                <div id="tocContent" class="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
-                    <p class="text-gray-500 text-sm">No TOC yet</p>
+            <!-- Right Panel: Document Content -->
+            <div class="col-span-8 bg-white rounded-lg shadow-md flex flex-col overflow-hidden">
+                <!-- Tabs -->
+                <div class="border-b border-gray-200 px-4 pt-3">
+                    <nav class="flex space-x-4">
+                        <button onclick="showResultTab('draft')" id="rtab-draft" class="result-tab px-3 py-2 font-medium text-sm text-blue-600 border-b-2 border-blue-600">
+                            Draft
+                        </button>
+                        <button onclick="showResultTab('edited')" id="rtab-edited" class="result-tab px-3 py-2 font-medium text-sm text-gray-500 hover:text-gray-700">
+                            Edited
+                        </button>
+                        <button onclick="showResultTab('quality')" id="rtab-quality" class="result-tab px-3 py-2 font-medium text-sm text-gray-500 hover:text-gray-700">
+                            Quality
+                        </button>
+                        <button onclick="showResultTab('glossary')" id="rtab-glossary" class="result-tab px-3 py-2 font-medium text-sm text-gray-500 hover:text-gray-700">
+                            Glossary
+                        </button>
+                        <button onclick="showResultTab('plan')" id="rtab-plan" class="result-tab px-3 py-2 font-medium text-sm text-gray-500 hover:text-gray-700">
+                            Edit Plan
+                        </button>
+                    </nav>
                 </div>
-            </div>
 
-            <div id="result-quality" class="result-content hidden">
-                <div id="qualityContent" class="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
-                    <p class="text-gray-500 text-sm">No quality report yet</p>
+                <!-- Content -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    <div id="result-draft" class="result-content">
+                        <div id="draftContent" class="prose prose-sm max-w-none">
+                            <p class="text-gray-500 text-sm">No document draft yet</p>
+                        </div>
+                    </div>
+
+                    <div id="result-edited" class="result-content hidden">
+                        <div id="editedContent" class="prose prose-sm max-w-none">
+                            <p class="text-gray-500 text-sm">No edited document yet</p>
+                        </div>
+                    </div>
+
+                    <div id="result-quality" class="result-content hidden">
+                        <div id="qualityContent">
+                            <p class="text-gray-500 text-sm">No quality report yet</p>
+                        </div>
+                    </div>
+
+                    <div id="result-glossary" class="result-content hidden">
+                        <div id="glossaryContent">
+                            <p class="text-gray-500 text-sm">No glossary yet</p>
+                        </div>
+                    </div>
+
+                    <div id="result-plan" class="result-content hidden">
+                        <div id="planContent">
+                            <p class="text-gray-500 text-sm">No edit plan yet</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -123,7 +171,7 @@
             </div>
         </div>
 
-        <div id="errorBanner" class="hidden fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg max-w-md">
+        <div id="errorBanner" class="hidden fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg max-w-md z-50">
             <span id="errorText"></span>
         </div>
     </div>
@@ -154,6 +202,10 @@
             return document.getElementById('profileSelect').value;
         }
 
+        function getEditLevel() {
+            return document.getElementById('editLevelSelect').value;
+        }
+
         async function createTestDocument() {
             showLoading('Creating test document...');
             try {
@@ -162,12 +214,12 @@
                 if (resp.ok) {
                     document.getElementById('documentId').value = data.document_id;
                     document.getElementById('statusInfo').innerHTML = `
-                        <p class="text-green-600">Test document created!</p>
-                        <p class="text-xs text-gray-500 font-mono">${data.document_id}</p>
+                        <p class="text-green-600 font-medium">Created!</p>
+                        <p class="text-gray-500 font-mono truncate" title="${data.document_id}">${data.document_id.slice(0, 8)}...</p>
                     `;
                     await loadStatus();
                 } else {
-                    showError(data.error || 'Failed to create test document');
+                    showError(data.error || 'Failed');
                 }
             } catch (e) {
                 showError(e.message);
@@ -188,38 +240,18 @@
             tab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
         }
 
-        async function runDocument() {
-            const docId = getDocumentId();
-            if (!docId) { showError('Enter Document ID'); return; }
-
-            showLoading('Starting document generation...');
-            try {
-                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/run/?step=document&profile=${getProfile()}`, { method: 'POST' });
-                const data = await resp.json();
-                if (resp.ok) {
-                    document.getElementById('statusInfo').innerHTML = `<p class="text-green-600">Job queued: ${data.job_id}</p>`;
-                } else {
-                    showError(data.error || 'Failed');
-                }
-            } catch (e) {
-                showError(e.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
         async function runDocumentSync() {
             const docId = getDocumentId();
             if (!docId) { showError('Enter Document ID'); return; }
 
-            showLoading('Running document generation (sync)...');
+            showLoading('Generating document...');
             try {
                 const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/run-sync/?step=document&profile=${getProfile()}`, { method: 'POST' });
                 const data = await resp.json();
                 if (resp.ok) {
                     document.getElementById('statusInfo').innerHTML = `
-                        <p class="text-green-600">Generation complete!</p>
-                        <p class="text-xs">Created: ${data.artifacts_created?.length || 0}, Cached: ${data.artifacts_cached?.length || 0}</p>
+                        <p class="text-green-600 font-medium">Generated!</p>
+                        <p class="text-gray-500 text-xs">Created: ${data.artifacts_created?.length || 0}</p>
                     `;
                     await loadStatus();
                 } else {
@@ -232,16 +264,21 @@
             }
         }
 
-        async function resumeDocument() {
+        async function runEditSync() {
             const docId = getDocumentId();
             if (!docId) { showError('Enter Document ID'); return; }
 
-            showLoading('Resuming document generation...');
+            showLoading('Running editor...');
             try {
-                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/run/?step=resume&profile=${getProfile()}`, { method: 'POST' });
+                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/run-sync/?step=edit&level=${getEditLevel()}`, { method: 'POST' });
                 const data = await resp.json();
                 if (resp.ok) {
-                    document.getElementById('statusInfo').innerHTML = `<p class="text-yellow-600">Resume queued: ${data.job_id}</p>`;
+                    document.getElementById('statusInfo').innerHTML = `
+                        <p class="text-purple-600 font-medium">Edited!</p>
+                        <p class="text-gray-500 text-xs">Sections: ${data.sections_edited || 0}</p>
+                    `;
+                    await loadStatus();
+                    showResultTab('edited');
                 } else {
                     showError(data.error || 'Failed');
                 }
@@ -252,16 +289,17 @@
             }
         }
 
-        async function runSection(key) {
+        async function runSection(key, action = 'generate') {
             const docId = getDocumentId();
             if (!docId) { showError('Enter Document ID'); return; }
 
-            showLoading(`Regenerating section ${key}...`);
+            showLoading(`Processing section ${key}...`);
             try {
-                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/run/?step=section&key=${key}&profile=${getProfile()}&force=1`, { method: 'POST' });
+                const step = action === 'edit' ? 'edit_section' : 'section';
+                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/run-sync/?step=${step}&key=${key}&profile=${getProfile()}&force=1`, { method: 'POST' });
                 const data = await resp.json();
                 if (resp.ok) {
-                    document.getElementById('statusInfo').innerHTML = `<p class="text-blue-600">Section ${key} queued: ${data.job_id}</p>`;
+                    await loadStatus();
                 } else {
                     showError(data.error || 'Failed');
                 }
@@ -274,9 +312,8 @@
 
         async function loadStatus() {
             const docId = getDocumentId();
-            if (!docId) { showError('Enter Document ID'); return; }
+            if (!docId) return;
 
-            showLoading('Loading status...');
             try {
                 const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/status/`);
                 const data = await resp.json();
@@ -288,36 +325,44 @@
 
                 document.getElementById('statusInfo').innerHTML = `
                     <p><strong>Status:</strong> ${data.document_status}</p>
-                    <p>Outline: ${data.has_outline ? '✓' : '✗'} |
-                       Draft: ${data.has_draft ? '✓' : '✗'} |
-                       TOC: ${data.has_toc ? '✓' : '✗'} |
-                       Quality: ${data.has_quality_report ? '✓' : '✗'}</p>
+                    <p class="text-gray-500">
+                        O:${data.has_outline ? '✓' : '✗'}
+                        D:${data.has_draft ? '✓' : '✗'}
+                        Q:${data.has_quality_report ? '✓' : '✗'}
+                        E:${data.has_edited ? '✓' : '✗'}
+                    </p>
                 `;
 
                 const tbody = document.getElementById('sectionsTable');
                 if (data.sections && data.sections.length > 0) {
                     tbody.innerHTML = data.sections.map(s => `
-                        <tr>
-                            <td class="px-3 py-2 font-mono text-xs">${s.key}</td>
-                            <td class="px-3 py-2">${s.title}</td>
-                            <td class="px-3 py-2 text-center">${s.has_context_pack ? '<span class="text-green-600">✓</span>' : '<span class="text-gray-400">✗</span>'}</td>
-                            <td class="px-3 py-2 text-center">${s.has_section ? '<span class="text-green-600">✓</span>' : '<span class="text-gray-400">✗</span>'}</td>
-                            <td class="px-3 py-2 text-center">${s.has_summary ? '<span class="text-green-600">✓</span>' : '<span class="text-gray-400">✗</span>'}</td>
-                            <td class="px-3 py-2 text-center">
-                                <button onclick="runSection('${s.key}')" class="text-blue-600 hover:text-blue-800 text-xs">Regen</button>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-2 py-1.5 font-mono">${s.key}</td>
+                            <td class="px-2 py-1.5 truncate max-w-[100px]" title="${s.title}">${s.title}</td>
+                            <td class="px-2 py-1.5 text-center">${s.has_context_pack ? '<span class="text-green-600">✓</span>' : '<span class="text-gray-300">·</span>'}</td>
+                            <td class="px-2 py-1.5 text-center">${s.has_section ? '<span class="text-green-600">✓</span>' : '<span class="text-gray-300">·</span>'}</td>
+                            <td class="px-2 py-1.5 text-center">${s.has_summary ? '<span class="text-green-600">✓</span>' : '<span class="text-gray-300">·</span>'}</td>
+                            <td class="px-2 py-1.5 text-center">${s.has_edited ? '<span class="text-purple-600">✓</span>' : '<span class="text-gray-300">·</span>'}</td>
+                            <td class="px-2 py-1.5 text-center">
+                                <button onclick="runSection('${s.key}')" class="text-blue-600 hover:text-blue-800" title="Regenerate">↻</button>
                             </td>
                         </tr>
                     `).join('');
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">No sections</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-2 py-3 text-center text-gray-500">No sections</td></tr>';
                 }
 
-                await Promise.all([loadDraft(docId), loadToc(docId), loadQuality(docId)]);
+                await Promise.all([
+                    loadDraft(docId),
+                    loadEdited(docId),
+                    loadQuality(docId),
+                    loadGlossary(docId),
+                    loadEditPlan(docId),
+                    loadEditArtifacts(docId)
+                ]);
 
             } catch (e) {
                 showError(e.message);
-            } finally {
-                hideLoading();
             }
         }
 
@@ -329,9 +374,9 @@
                     const sections = data.data?.sections || [];
                     let html = '';
                     for (const s of sections) {
-                        html += `<h2 class="text-lg font-bold mt-4">${s.title}</h2>`;
-                        html += `<p class="text-xs text-gray-500">${s.word_count} words</p>`;
-                        html += `<div class="prose prose-sm max-w-none">${marked ? marked.parse(s.content_md) : s.content_md}</div>`;
+                        html += `<h2 class="text-lg font-bold mt-6 mb-2 text-gray-800">${s.title}</h2>`;
+                        html += `<p class="text-xs text-gray-400 mb-2">${s.word_count} words</p>`;
+                        html += `<div class="text-sm text-gray-700 leading-relaxed">${marked ? marked.parse(s.content_md || '') : s.content_md}</div>`;
                     }
                     document.getElementById('draftContent').innerHTML = html || '<p class="text-gray-500">Empty draft</p>';
                 }
@@ -340,22 +385,24 @@
             }
         }
 
-        async function loadToc(docId) {
+        async function loadEdited(docId) {
             try {
-                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/toc/`);
+                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/edited/`);
                 if (resp.ok) {
                     const data = await resp.json();
-                    const items = data.data?.items || [];
-                    let html = '<ul class="list-disc pl-4">';
-                    for (const item of items) {
-                        const indent = (item.level - 1) * 16;
-                        html += `<li style="margin-left: ${indent}px">${item.title}</li>`;
+                    if (data.data?.sections) {
+                        let html = '';
+                        for (const [key, text] of Object.entries(data.data.sections)) {
+                            html += `<h2 class="text-lg font-bold mt-6 mb-2 text-gray-800">${key}</h2>`;
+                            html += `<div class="text-sm text-gray-700 leading-relaxed">${marked ? marked.parse(text || '') : text}</div>`;
+                        }
+                        document.getElementById('editedContent').innerHTML = html || '<p class="text-gray-500">Empty</p>';
                     }
-                    html += '</ul>';
-                    document.getElementById('tocContent').innerHTML = html || '<p class="text-gray-500">Empty TOC</p>';
+                } else {
+                    document.getElementById('editedContent').innerHTML = '<p class="text-gray-500">No edited document yet</p>';
                 }
             } catch (e) {
-                console.error('Failed to load TOC:', e);
+                console.error('Failed to load edited:', e);
             }
         }
 
@@ -365,30 +412,134 @@
                 if (resp.ok) {
                     const data = await resp.json();
                     const q = data.data || {};
-                    let html = `<p class="font-bold ${data.passed ? 'text-green-600' : 'text-red-600'}">${data.passed ? 'PASSED' : 'FAILED'}</p>`;
-                    html += `<p>Errors: ${data.error_count}, Warnings: ${data.warning_count}</p>`;
-                    html += `<p>Total words: ${q.stats?.total_words || 0}</p>`;
 
-                    if (q.errors?.length > 0) {
-                        html += '<h3 class="font-bold text-red-600 mt-2">Errors:</h3><ul class="list-disc pl-4">';
-                        for (const e of q.errors) {
-                            html += `<li>[${e.code}] ${e.message}</li>`;
+                    let html = `<div class="space-y-4">`;
+
+                    // Summary
+                    html += `<div class="bg-gray-50 p-3 rounded">
+                        <p class="font-medium ${data.passed ? 'text-green-600' : 'text-red-600'}">${data.passed ? '✓ PASSED' : '✗ FAILED'}</p>
+                        <p class="text-sm text-gray-600">Words: ${q.stats?.total_words || 0} | Chars: ${q.total_chars || 0}</p>
+                    </div>`;
+
+                    // Repeats
+                    if (q.global_repeats?.length > 0) {
+                        html += `<div><h3 class="font-medium text-gray-700 mb-2">Global Repeats</h3><ul class="text-sm space-y-1">`;
+                        for (const r of q.global_repeats.slice(0, 10)) {
+                            html += `<li class="text-gray-600">"${r.phrase}" × ${r.count}</li>`;
                         }
-                        html += '</ul>';
+                        html += `</ul></div>`;
                     }
 
-                    if (q.warnings?.length > 0) {
-                        html += '<h3 class="font-bold text-yellow-600 mt-2">Warnings:</h3><ul class="list-disc pl-4">';
-                        for (const w of q.warnings) {
-                            html += `<li>[${w.code}] ${w.message}</li>`;
+                    // Style issues
+                    if (q.style_issues?.length > 0) {
+                        html += `<div><h3 class="font-medium text-yellow-700 mb-2">Style Issues</h3><ul class="text-sm space-y-1">`;
+                        for (const issue of q.style_issues) {
+                            html += `<li class="text-yellow-600">${issue}</li>`;
                         }
-                        html += '</ul>';
+                        html += `</ul></div>`;
                     }
 
+                    // Comparison (if v2)
+                    if (q.comparison) {
+                        html += `<div class="border-t pt-3 mt-3"><h3 class="font-medium text-gray-700 mb-2">Before/After</h3>`;
+                        if (q.comparison.improvements?.length > 0) {
+                            html += `<p class="text-green-600 text-sm">✓ ${q.comparison.improvements.join(', ')}</p>`;
+                        }
+                        if (q.comparison.regressions?.length > 0) {
+                            html += `<p class="text-red-600 text-sm">✗ ${q.comparison.regressions.join(', ')}</p>`;
+                        }
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
                     document.getElementById('qualityContent').innerHTML = html;
                 }
             } catch (e) {
                 console.error('Failed to load quality:', e);
+            }
+        }
+
+        async function loadGlossary(docId) {
+            try {
+                const resp = await fetch(`${API_BASE}/documents/${docId}/artifacts/?kind=glossary`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.artifacts?.length > 0) {
+                        const glossary = data.artifacts[0].data_json;
+                        let html = '<div class="space-y-2">';
+                        for (const term of (glossary?.terms || [])) {
+                            html += `<div class="bg-gray-50 p-2 rounded text-sm">
+                                <span class="font-medium">${term.canonical}</span>
+                                <span class="text-gray-500 text-xs ml-2">${term.variants?.join(', ') || ''}</span>
+                            </div>`;
+                        }
+                        html += '</div>';
+                        document.getElementById('glossaryContent').innerHTML = html || '<p class="text-gray-500">Empty</p>';
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load glossary:', e);
+            }
+        }
+
+        async function loadEditPlan(docId) {
+            try {
+                const resp = await fetch(`${API_BASE}/documents/${docId}/artifacts/?kind=edit_plan`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.artifacts?.length > 0) {
+                        const plan = data.artifacts[0].data_json;
+                        let html = '<div class="space-y-3">';
+
+                        if (plan?.sections_to_edit?.length > 0) {
+                            html += '<div><h3 class="font-medium text-gray-700 mb-2">Sections to Edit</h3><ul class="text-sm space-y-1">';
+                            for (const s of plan.sections_to_edit) {
+                                html += `<li><span class="font-mono">${s.key}</span> — ${s.action} (p${s.priority})</li>`;
+                            }
+                            html += '</ul></div>';
+                        }
+
+                        if (plan?.transitions_needed?.length > 0) {
+                            html += `<div><h3 class="font-medium text-gray-700 mb-2">Transitions</h3>
+                                <p class="text-sm text-gray-600">${plan.transitions_needed.map(t => t.join('→')).join(', ')}</p></div>`;
+                        }
+
+                        if (plan?.terms_to_unify?.length > 0) {
+                            html += `<div><h3 class="font-medium text-gray-700 mb-2">Terms to Unify</h3>
+                                <p class="text-sm text-gray-600">${plan.terms_to_unify.join(', ')}</p></div>`;
+                        }
+
+                        html += '</div>';
+                        document.getElementById('planContent').innerHTML = html;
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load edit plan:', e);
+            }
+        }
+
+        async function loadEditArtifacts(docId) {
+            try {
+                const kinds = ['edit_plan', 'glossary', 'quality_report', 'consistency_report', 'transitions', 'document_edited'];
+                const checks = await Promise.all(kinds.map(async k => {
+                    const resp = await fetch(`${API_BASE}/documents/${docId}/artifacts/?kind=${k}`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        return { kind: k, exists: data.artifacts?.length > 0 };
+                    }
+                    return { kind: k, exists: false };
+                }));
+
+                let html = '<div class="grid grid-cols-2 gap-1">';
+                for (const c of checks) {
+                    const color = c.exists ? 'text-green-600' : 'text-gray-400';
+                    const icon = c.exists ? '✓' : '·';
+                    html += `<span class="${color} text-xs">${icon} ${c.kind}</span>`;
+                }
+                html += '</div>';
+                document.getElementById('editArtifacts').innerHTML = html;
+            } catch (e) {
+                console.error('Failed to load edit artifacts:', e);
             }
         }
     </script>

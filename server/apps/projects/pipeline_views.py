@@ -19,6 +19,10 @@ from services.pipeline import (
     get_section_spec,
 )
 from services.pipeline.tasks import run_document_task, run_section_task, resume_document_task
+from services.editor import (
+    EditorService,
+    EditLevel,
+)
 
 
 @extend_schema(
@@ -111,12 +115,30 @@ def pipeline_status(request, document_id):
     toc = get_success_artifact(document_id, ArtifactKind.TOC.value)
     quality = get_success_artifact(document_id, ArtifactKind.QUALITY_REPORT.value)
 
+    edited = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.DOCUMENT_EDITED
+    ).first()
+    glossary = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.GLOSSARY
+    ).first()
+    edit_plan = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.EDIT_PLAN
+    ).first()
+
     sections_status = []
     for key in get_all_section_keys():
         spec = get_section_spec(key)
         context_pack = get_success_artifact(document_id, ArtifactKind.context_pack(key))
         section = get_success_artifact(document_id, ArtifactKind.section(key))
         summary = get_success_artifact(document_id, ArtifactKind.section_summary(key))
+        section_edited = DocumentArtifact.objects.filter(
+            document_id=document_id,
+            section__key=key,
+            kind=DocumentArtifact.Kind.SECTION_EDITED
+        ).first()
 
         sections_status.append({
             'key': key,
@@ -125,9 +147,11 @@ def pipeline_status(request, document_id):
             'has_context_pack': context_pack is not None,
             'has_section': section is not None,
             'has_summary': summary is not None,
+            'has_edited': section_edited is not None,
             'context_pack_id': str(context_pack.id) if context_pack else None,
             'section_id': str(section.id) if section else None,
             'summary_id': str(summary.id) if summary else None,
+            'edited_id': str(section_edited.id) if section_edited else None,
         })
 
     return Response({
@@ -137,10 +161,16 @@ def pipeline_status(request, document_id):
         'has_draft': draft is not None,
         'has_toc': toc is not None,
         'has_quality_report': quality is not None,
+        'has_edited': edited is not None,
+        'has_glossary': glossary is not None,
+        'has_edit_plan': edit_plan is not None,
         'outline_id': str(outline.id) if outline else None,
         'draft_id': str(draft.id) if draft else None,
         'toc_id': str(toc.id) if toc else None,
         'quality_report_id': str(quality.id) if quality else None,
+        'edited_id': str(edited.id) if edited else None,
+        'glossary_id': str(glossary.id) if glossary else None,
+        'edit_plan_id': str(edit_plan.id) if edit_plan else None,
         'sections': sections_status,
     })
 
@@ -251,19 +281,59 @@ def get_pipeline_sections(request):
 @extend_schema(
     description="Run pipeline synchronously (for testing without Celery)",
     parameters=[
-        OpenApiParameter(name='step', description='document | section', required=False, type=str),
+        OpenApiParameter(name='step', description='document | section | analyze | edit', required=False, type=str),
         OpenApiParameter(name='key', description='Section key (for step=section)', required=False, type=str),
         OpenApiParameter(name='profile', description='fast | default | heavy', required=False, type=str),
+        OpenApiParameter(name='level', description='Edit level 1-3 (for step=edit)', required=False, type=int),
     ],
     tags=["Pipeline"]
 )
 @api_view(['POST'])
 def run_pipeline_sync(request, document_id):
+    from asgiref.sync import async_to_sync
+
     doc = get_object_or_404(Document, id=document_id)
 
     step = request.query_params.get('step', 'document')
     profile = request.query_params.get('profile', 'fast')
     key = request.query_params.get('key')
+    level = int(request.query_params.get('level', 1))
+
+    if step == 'analyze':
+        service = EditorService()
+        quality_report, artifact = service.run_analyze_only(doc)
+
+        return Response({
+            'success': True,
+            'artifact_id': str(artifact.id),
+            'total_chars': quality_report.total_chars,
+            'total_words': quality_report.total_words,
+            'style_markers': sum(quality_report.style_marker_counts.values()),
+            'global_repeats': len(quality_report.global_repeats),
+        })
+
+    if step == 'edit':
+        if level not in [1, 2, 3]:
+            return Response({'error': 'level must be 1, 2, or 3'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            service = EditorService()
+            edit_level = EditLevel(level)
+
+            result = async_to_sync(service.run_full_pipeline)(
+                document_id=document_id,
+                level=edit_level,
+                force=False,
+            )
+
+            return Response({
+                'success': True,
+                'sections_edited': len(result.sections),
+                'transitions_count': len(result.transitions),
+                'chapter_conclusions': len(result.chapter_conclusions),
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     try:
         get_profile(profile)
@@ -299,13 +369,79 @@ def run_pipeline_sync(request, document_id):
 
 
 @extend_schema(
+    description="Get edited document artifact",
+    tags=["Pipeline"]
+)
+@api_view(['GET'])
+def get_document_edited(request, document_id):
+    doc = get_object_or_404(Document, id=document_id)
+    edited = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.DOCUMENT_EDITED
+    ).order_by('-created_at').first()
+
+    if not edited:
+        return Response({'error': 'Edited document not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'artifact_id': str(edited.id),
+        'created_at': edited.created_at.isoformat(),
+        'data': edited.data_json,
+    })
+
+
+@extend_schema(
+    description="Get glossary artifact",
+    tags=["Pipeline"]
+)
+@api_view(['GET'])
+def get_glossary(request, document_id):
+    doc = get_object_or_404(Document, id=document_id)
+    glossary = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.GLOSSARY
+    ).order_by('-created_at').first()
+
+    if not glossary:
+        return Response({'error': 'Glossary not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'artifact_id': str(glossary.id),
+        'created_at': glossary.created_at.isoformat(),
+        'data': glossary.data_json,
+    })
+
+
+@extend_schema(
+    description="Get edit plan artifact",
+    tags=["Pipeline"]
+)
+@api_view(['GET'])
+def get_edit_plan(request, document_id):
+    doc = get_object_or_404(Document, id=document_id)
+    edit_plan = DocumentArtifact.objects.filter(
+        document_id=document_id,
+        kind=DocumentArtifact.Kind.EDIT_PLAN
+    ).order_by('-created_at').first()
+
+    if not edit_plan:
+        return Response({'error': 'Edit plan not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        'artifact_id': str(edit_plan.id),
+        'created_at': edit_plan.created_at.isoformat(),
+        'data': edit_plan.data_json,
+    })
+
+
+@extend_schema(
     description="Create test document with sample facts for pipeline testing",
     tags=["Pipeline"]
 )
 @api_view(['POST'])
 def create_test_document(request):
     project = Project.objects.create(
-        repo_url="https://github.com/test/sample-repo",
+        repo_url="https://github.com/HubMan17/academic-paper-generator",
     )
 
     analysis_run = AnalysisRun.objects.create(
@@ -317,65 +453,67 @@ def create_test_document(request):
         analysis_run=analysis_run,
         kind=Artifact.Kind.FACTS,
         data={
+            "schema": "facts.v1",
             "repo": {
-                "url": "https://github.com/test/sample-repo",
-                "commit": "abc123def456",
-                "detected_at": "2024-01-01T00:00:00Z",
+                "url": "https://github.com/HubMan17/academic-paper-generator",
+                "commit": "8802cc6a07a73677ae3c2ed490a2fa383ff1bd69",
+                "detected_at": "2026-01-03T20:37:18.786192Z",
             },
             "languages": [
-                {"name": "Python", "ratio": 0.7, "lines_of_code": 5000},
-                {"name": "JavaScript", "ratio": 0.2, "lines_of_code": 1500},
-                {"name": "HTML", "ratio": 0.1, "lines_of_code": 500},
+                {"name": "Python", "ratio": 0.97, "lines_of_code": 5704, "evidence": [{"path": "*.py"}]},
+                {"name": "TypeScript", "ratio": 0.03, "lines_of_code": 158, "evidence": [{"path": "*.ts"}, {"path": "*.tsx"}]},
+                {"name": "JavaScript", "ratio": 0, "lines_of_code": 16, "evidence": [{"path": "*.js"}, {"path": "*.jsx"}]},
             ],
             "frameworks": [
-                {"name": "Django", "type": "backend", "version": "5.0"},
-                {"name": "Django REST Framework", "type": "backend", "version": "3.14"},
-                {"name": "React", "type": "frontend", "version": "18.2"},
+                {"name": "Django", "type": "web", "evidence": [{"path": "server/requirements.txt"}]},
+                {"name": "Celery", "type": "task-queue", "evidence": [{"path": "server/requirements.txt"}]},
+                {"name": "pytest", "type": "testing", "evidence": [{"path": "server/requirements.txt"}]},
+                {"name": "React", "type": "frontend", "evidence": [{"path": "client/package.json"}]},
+                {"name": "TailwindCSS", "type": "styling", "evidence": [{"path": "client/package.json"}]},
             ],
             "architecture": {
-                "type": "layered",
-                "layers": ["api", "services", "models"],
-                "evidence": [
-                    {"path": "server/apps/", "description": "Django apps"},
-                    {"path": "server/services/", "description": "Business logic"},
-                    {"path": "client/src/", "description": "React frontend"},
-                ],
+                "type": "client-server",
+                "layers": ["frontend", "backend"],
+                "details": {"separation": "monorepo", "api_type": "REST"},
+                "evidence": [{"path": "client", "lines": []}, {"path": "server", "lines": []}],
             },
             "modules": [
-                {"path": "server/apps/core/", "type": "app", "name": "core"},
-                {"path": "server/apps/projects/", "type": "app", "name": "projects"},
-                {"path": "server/services/llm/", "type": "service", "name": "llm"},
-                {"path": "server/services/analyzer/", "type": "service", "name": "analyzer"},
+                {"name": "apps", "role": "module", "path": "server/apps", "submodules": ["accounts:submodule", "core:submodule", "llm:submodule", "projects:submodule"]},
+                {"name": "config", "role": "configuration", "path": "server/config", "submodules": []},
+                {"name": "services", "role": "business-logic", "path": "server/services", "submodules": ["analyzer:submodule", "documents:submodule", "llm:submodule", "prompting:submodule"]},
+                {"name": "tasks", "role": "module", "path": "server/tasks", "submodules": []},
+                {"name": "templates", "role": "templates", "path": "server/templates", "submodules": ["core:submodule", "dev:submodule"]},
+                {"name": "tests", "role": "testing", "path": "server/tests", "submodules": ["test_analyzer:submodule", "test_documents:submodule", "test_llm:submodule", "test_prompting:submodule"]},
+                {"name": "public", "role": "static-files", "path": "client/public", "submodules": []},
+                {"name": "src", "role": "module", "path": "client/src", "submodules": ["components:ui-components", "hooks:react-hooks", "pages:pages", "services:business-logic", "types:type-definitions"]},
+                {"name": "docs", "role": "top-level", "path": "docs", "submodules": []},
             ],
-            "dependencies": {
-                "backend": [
-                    {"name": "django", "version": "5.0"},
-                    {"name": "djangorestframework", "version": "3.14"},
-                    {"name": "celery", "version": "5.3"},
-                    {"name": "openai", "version": "1.0"},
+            "api": {"endpoints": [], "total_count": 0},
+            "frontend_routes": [{"path": "/", "name": "", "component": "", "file": "client/src/App.tsx", "auth_required": False}],
+            "models": [],
+            "runtime": {
+                "dependencies": [
+                    {"name": "django", "version": ">=5.0"},
+                    {"name": "djangorestframework", "version": ">=3.14"},
+                    {"name": "drf-spectacular", "version": ">=0.27"},
+                    {"name": "celery", "version": ">=5.3"},
+                    {"name": "redis", "version": ">=5.0"},
+                    {"name": "python-dotenv", "version": ">=1.0"},
+                    {"name": "django-cors-headers", "version": ">=4.3"},
+                    {"name": "pytest", "version": ">=8.0"},
+                    {"name": "pytest-django", "version": ">=4.7"},
+                    {"name": "pytest-mock", "version": ">=3.0"},
+                    {"name": "openai", "version": ">=1.0"},
+                    {"name": "jsonschema", "version": ">=4.0"},
+                    {"name": "react", "version": "^18.2.0"},
+                    {"name": "react-dom", "version": "^18.2.0"},
+                    {"name": "react-router-dom", "version": "^6.20.0"},
+                    {"name": "tailwindcss", "version": "^3.4.0"},
+                    {"name": "typescript", "version": "^5.3.3"},
+                    {"name": "vite", "version": "^5.0.10"},
                 ],
-                "frontend": [
-                    {"name": "react", "version": "18.2"},
-                    {"name": "tailwindcss", "version": "3.4"},
-                ],
-            },
-            "api": {
-                "endpoints": [
-                    {"method": "POST", "path": "/api/v1/analyze/", "description": "Start analysis"},
-                    {"method": "GET", "path": "/api/v1/jobs/{id}/", "description": "Get job status"},
-                    {"method": "POST", "path": "/api/v1/documents/", "description": "Create document"},
-                    {"method": "GET", "path": "/api/v1/documents/{id}/", "description": "Get document"},
-                ],
-            },
-            "models": [
-                {"name": "Project", "app": "projects", "fields": ["name", "repo_url"]},
-                {"name": "Document", "app": "projects", "fields": ["type", "language", "status"]},
-                {"name": "Section", "app": "projects", "fields": ["key", "title", "content"]},
-            ],
-            "testing": {
-                "framework": "pytest",
-                "coverage": 75,
-                "test_count": 120,
+                "build_files": ["client/package.json", "client/tsconfig.json", "client/vite.config.ts"],
+                "entrypoints": ["server/manage.py", "server/config/wsgi.py", "client/src/types/index.ts"],
             },
         }
     )
