@@ -27,6 +27,8 @@ class SectionMetrics:
     repeat_phrases: list[RepeatInfo] = field(default_factory=list)
     term_candidates: list[str] = field(default_factory=list)
     issues: list[str] = field(default_factory=list)
+    is_placeholder: bool = False
+    placeholder_reason: Optional[str] = None
 
 
 @dataclass
@@ -41,6 +43,7 @@ class QualityReport:
     empty_sections: list[str]
     style_issues: list[str]
     style_marker_counts: dict[str, int] = field(default_factory=dict)
+    placeholder_sections: list[str] = field(default_factory=list)
 
 
 @dataclass

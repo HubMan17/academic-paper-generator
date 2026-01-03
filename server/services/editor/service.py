@@ -85,7 +85,8 @@ class EditorService:
             sections = self._apply_consistency(sections, consistency_report)
 
             edited_sections = await self.step_edit_sections(
-                document, sections, glossary, edit_plan, level, idempotency_prefix
+                document, sections, glossary, edit_plan, level, idempotency_prefix,
+                quality_report=quality_report_v1
             )
 
             transitions = await self.step_transitions(
@@ -244,9 +245,14 @@ class EditorService:
         edit_plan: EditPlan,
         level: EditLevel,
         idempotency_prefix: str,
+        quality_report: QualityReport = None,
     ) -> dict[str, SectionEdited]:
         edited_sections: dict[str, SectionEdited] = {}
         completed_keys = await sync_to_async(self._get_completed_section_edits)(document)
+
+        placeholder_keys = set()
+        if quality_report:
+            placeholder_keys = set(quality_report.placeholder_sections)
 
         sections_by_key = {s["key"]: s for s in sections}
         ordered_keys = [s["key"] for s in sections]
@@ -258,6 +264,9 @@ class EditorService:
                 continue
 
             if key not in sections_by_key:
+                continue
+
+            if key in placeholder_keys:
                 continue
 
             section = sections_by_key[key]
