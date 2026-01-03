@@ -176,7 +176,7 @@ TAG_WEIGHTS = {
 }
 
 
-def _score_fact(fact: dict[str, Any], spec: SectionSpec) -> tuple[float, str]:
+def _score_fact(fact: dict[str, Any], spec: SectionSpec) -> tuple[float, list[str]]:
     score = 0.0
     reasons = []
 
@@ -185,7 +185,7 @@ def _score_fact(fact: dict[str, Any], spec: SectionSpec) -> tuple[float, str]:
 
     if fact_key in spec.fact_keys:
         score += 3.0
-        reasons.append(f"key:{fact_key}")
+        reasons.append(f"key:{fact_key}(+3.0)")
 
     for tag in spec.fact_tags:
         if tag in fact_tags:
@@ -196,13 +196,15 @@ def _score_fact(fact: dict[str, Any], spec: SectionSpec) -> tuple[float, str]:
     text = fact.get("text", "")
     if len(text) < 100:
         score += 0.3
+        reasons.append("short(+0.3)")
     elif len(text) > 500:
         score -= 0.2
+        reasons.append("long(-0.2)")
 
     if not reasons:
-        return 0.0, ""
+        return 0.0, []
 
-    return score, reasons[0] if reasons else ""
+    return score, reasons
 
 
 def select_facts(
@@ -228,20 +230,20 @@ def select_facts(
         if not fact_id:
             continue
 
-        score, reason = _score_fact(fact, spec)
+        score, reasons = _score_fact(fact, spec)
         if score > 0:
-            scored_facts.append((score, reason, fact))
+            scored_facts.append((score, reasons, fact))
 
     scored_facts.sort(key=lambda x: x[0], reverse=True)
 
     selected_facts = []
     fact_refs = []
 
-    for score, reason, fact in scored_facts[:max_facts]:
+    for score, reasons, fact in scored_facts[:max_facts]:
         selected_facts.append(fact)
         fact_refs.append(FactRef(
             fact_id=fact.get("id", ""),
-            reason=reason,
+            reason=" | ".join(reasons),
             weight=round(score, 2)
         ))
 

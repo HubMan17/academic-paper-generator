@@ -246,6 +246,9 @@ class DocumentService:
                 ])
 
             if not self.mock_mode:
+                estimated_tokens = context_pack_artifact.data_json.get(
+                    "budget", {}
+                ).get("estimated_input_tokens")
                 self._save_llm_trace(
                     document=document,
                     section=section,
@@ -253,7 +256,8 @@ class DocumentService:
                     result_meta=result.meta,
                     related_artifact_id=str(artifact.id),
                     context_pack_artifact_id=str(context_pack_artifact.id),
-                    job_id=job_id
+                    job_id=job_id,
+                    estimated_input_tokens=estimated_tokens
                 )
 
             return artifact
@@ -458,14 +462,23 @@ class DocumentService:
         result_meta,
         related_artifact_id: Optional[str] = None,
         context_pack_artifact_id: Optional[str] = None,
-        job_id: Optional[str] = None
+        job_id: Optional[str] = None,
+        estimated_input_tokens: Optional[int] = None
     ) -> DocumentArtifact:
+        actual_prompt_tokens = result_meta.prompt_tokens or 0
+        estimation_error_ratio = None
+
+        if estimated_input_tokens and estimated_input_tokens > 0 and actual_prompt_tokens > 0:
+            estimation_error_ratio = round(
+                (actual_prompt_tokens / estimated_input_tokens) - 1.0, 3
+            )
+
         trace_data = {
             "operation": operation,
             "model": result_meta.model,
             "latency_ms": result_meta.latency_ms,
             "tokens": {
-                "prompt": result_meta.prompt_tokens,
+                "prompt": actual_prompt_tokens,
                 "completion": result_meta.completion_tokens,
                 "total": result_meta.total_tokens
             },
@@ -473,7 +486,9 @@ class DocumentService:
             "section_key": section.key if section else None,
             "related_artifact_id": related_artifact_id,
             "context_pack_artifact_id": context_pack_artifact_id,
-            "job_id": job_id
+            "job_id": job_id,
+            "estimated_input_tokens": estimated_input_tokens,
+            "estimation_error_ratio": estimation_error_ratio
         }
 
         return DocumentArtifact.objects.create(

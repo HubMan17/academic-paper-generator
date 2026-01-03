@@ -91,7 +91,7 @@ def _extract_outline_excerpt(
 
     title = outline.get("title", "")
 
-    if mode == OutlineMode.PARENTS_ONLY:
+    if mode == OutlineMode.STRUCTURE:
         lines = []
         if title:
             lines.append(f"Название: {title}")

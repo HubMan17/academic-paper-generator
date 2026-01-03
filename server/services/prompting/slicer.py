@@ -46,7 +46,7 @@ def slice_for_section(
 
     debug = DebugInfo(
         selected_fact_refs=fact_refs,
-        selection_reason=f"Selected {len(selected_facts)} facts by tags/keys",
+        selection_reason=f"Selected {len(selected_facts)} facts, scored and sorted by weight",
         trims_applied=trims_applied
     )
 

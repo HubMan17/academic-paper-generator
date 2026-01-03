@@ -5,7 +5,7 @@ from enum import Enum
 
 class OutlineMode(str, Enum):
     FULL = "full"
-    PARENTS_ONLY = "parents_only"
+    STRUCTURE = "structure"
     LOCAL = "local"
 
 
