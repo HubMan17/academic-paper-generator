@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
-from .models import Project, AnalysisRun, Artifact, Document, Section
+from .models import Project, AnalysisRun, Artifact, Document, Section, DocumentArtifact
 from .serializers import (
     AnalyzeRequestSerializer,
     JobCreateResponseSerializer,
@@ -20,9 +20,13 @@ from .serializers import (
     SectionListSerializer,
     SectionDetailSerializer,
     JobIdResponseSerializer,
+    ContextPackResponseSerializer,
+    SectionLatestSerializer,
+    SectionSpecSerializer,
 )
 from services.analyzer.constants import ANALYZER_VERSION
 from services.documents import DocumentService, SectionBusy
+from services.prompting import get_section_spec, list_section_keys
 from tasks.analyzer_tasks import run_analysis
 
 
@@ -409,3 +413,82 @@ def generate_section(request, document_id, section_key):
         return Response({'job_id': job_id}, status=status.HTTP_202_ACCEPTED)
     except SectionBusy as e:
         return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
+
+
+@extend_schema(
+    responses={201: ContextPackResponseSerializer},
+    description="Собрать context pack для секции (без вызова LLM). "
+                "Возвращает artifact_id и данные context pack.",
+    tags=["Documents"]
+)
+@api_view(['POST'])
+def build_context_pack(request, document_id, section_key):
+    doc = get_object_or_404(Document, id=document_id)
+    get_object_or_404(Section, document=doc, key=section_key)
+
+    service = DocumentService()
+    artifact = service.build_context_pack(doc, section_key)
+
+    return Response({
+        'artifact_id': artifact.id,
+        'section_key': section_key,
+        'job_id': artifact.job_id,
+        'data': artifact.data_json
+    }, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(
+    responses={200: SectionLatestSerializer},
+    description="Получить последнее состояние секции: текст, summary, context_pack, llm_traces.",
+    tags=["Documents"]
+)
+@api_view(['GET'])
+def section_latest(request, document_id, section_key):
+    doc = get_object_or_404(Document, id=document_id)
+    section = get_object_or_404(Section, document=doc, key=section_key)
+
+    context_pack = DocumentArtifact.objects.filter(
+        document=doc,
+        section=section,
+        kind=DocumentArtifact.Kind.CONTEXT_PACK
+    ).order_by('-created_at').first()
+
+    llm_traces = list(DocumentArtifact.objects.filter(
+        document=doc,
+        section=section,
+        kind=DocumentArtifact.Kind.LLM_TRACE
+    ).order_by('-created_at')[:10])
+
+    data = {
+        'section': section,
+        'context_pack': context_pack,
+        'llm_traces': llm_traces
+    }
+
+    return Response(SectionLatestSerializer(data).data)
+
+
+@extend_schema(
+    responses={200: SectionSpecSerializer(many=True)},
+    description="Получить список всех доступных секций из registry с их spec.",
+    tags=["Sections"]
+)
+@api_view(['GET'])
+def sections_registry(request):
+    section_keys = list_section_keys()
+    specs = []
+
+    for key in section_keys:
+        spec = get_section_spec(key)
+        specs.append({
+            'key': spec.key,
+            'fact_tags': spec.fact_tags,
+            'fact_keys': spec.fact_keys,
+            'outline_mode': spec.outline_mode,
+            'needs_summaries': spec.needs_summaries,
+            'style_profile': spec.style_profile,
+            'target_chars': spec.target_chars,
+            'constraints': spec.constraints
+        })
+
+    return Response(SectionSpecSerializer(specs, many=True).data)
