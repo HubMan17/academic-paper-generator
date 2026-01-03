@@ -11,7 +11,33 @@ MIN_PHRASE_LENGTH = 3
 MAX_PHRASE_LENGTH = 8
 MIN_REPEAT_COUNT = 2
 MIN_SECTION_CHARS = 500
+MIN_CONTENT_CHARS = 200
 NGRAM_SIZES = [3, 4, 5]
+
+PLACEHOLDER_MARKERS = [
+    r'\[TBD\]',
+    r'\[TODO\]',
+    r'\[placeholder\]',
+    r'\[здесь будет текст\]',
+    r'\[текст секции\]',
+    r'\[заполнить\]',
+    r'\[добавить\]',
+    r'Lorem ipsum',
+    r'Текст заглушка',
+    r'Заглушка',
+]
+
+GENERIC_CONTENT_PATTERNS = [
+    r'^Введение\.?\s*$',
+    r'^Заключение\.?\s*$',
+    r'^В данной секции',
+    r'^В данном разделе',
+    r'^Данная секция',
+    r'^Данный раздел',
+    r'^Здесь будет',
+    r'^Этот раздел посвящен',
+    r'^Рассматриваются вопросы',
+]
 
 TEMPLATE_MARKERS = [
     "отсутствует информация",
@@ -36,6 +62,37 @@ TEMPLATE_MARKERS = [
 ]
 
 
+def _detect_placeholder(text: str, char_count: int) -> tuple[bool, str | None]:
+    if char_count < MIN_CONTENT_CHARS:
+        return True, f"Секция слишком короткая ({char_count} символов, минимум {MIN_CONTENT_CHARS})"
+
+    text_lower = text.lower().strip()
+
+    for pattern in PLACEHOLDER_MARKERS:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True, f"Найден маркер-заглушка: {pattern}"
+
+    for pattern in GENERIC_CONTENT_PATTERNS:
+        if re.match(pattern, text_lower, re.IGNORECASE | re.MULTILINE):
+            stripped = re.sub(pattern, '', text_lower, flags=re.IGNORECASE | re.MULTILINE).strip()
+            if len(stripped) < MIN_CONTENT_CHARS:
+                return True, "Только общие вводные фразы без конкретного содержания"
+
+    sentences = _split_sentences(text)
+    if len(sentences) <= 2 and char_count < MIN_SECTION_CHARS:
+        return True, f"Только {len(sentences)} предложений, недостаточно контента"
+
+    missing_info_count = 0
+    for marker in TEMPLATE_MARKERS[:6]:
+        if marker.lower() in text_lower:
+            missing_info_count += 1
+
+    if missing_info_count >= 2:
+        return True, f"Найдено {missing_info_count} маркеров 'отсутствующей информации'"
+
+    return False, None
+
+
 def analyze_document(sections: list[dict]) -> QualityReport:
     section_metrics = []
     all_text_combined = ""
@@ -43,6 +100,7 @@ def analyze_document(sections: list[dict]) -> QualityReport:
     term_candidates_global: set[str] = set()
     short_sections: list[str] = []
     empty_sections: list[str] = []
+    placeholder_sections: list[str] = []
 
     for section in sections:
         key = section.get("key", "")
@@ -51,6 +109,7 @@ def analyze_document(sections: list[dict]) -> QualityReport:
 
         if not text.strip():
             empty_sections.append(key)
+            placeholder_sections.append(key)
             section_metrics.append(SectionMetrics(
                 key=key,
                 title=title,
@@ -58,13 +117,18 @@ def analyze_document(sections: list[dict]) -> QualityReport:
                 word_count=0,
                 sentence_count=0,
                 avg_sentence_length=0.0,
-                issues=["Секция пуста"]
+                issues=["Секция пуста"],
+                is_placeholder=True,
+                placeholder_reason="Секция пуста",
             ))
             continue
 
         all_text_combined += " " + text
         metrics = _analyze_section(key, title, text)
         section_metrics.append(metrics)
+
+        if metrics.is_placeholder:
+            placeholder_sections.append(key)
 
         if metrics.char_count < MIN_SECTION_CHARS:
             short_sections.append(key)
@@ -93,6 +157,7 @@ def analyze_document(sections: list[dict]) -> QualityReport:
         empty_sections=empty_sections,
         style_issues=style_issues,
         style_marker_counts=style_marker_counts,
+        placeholder_sections=placeholder_sections,
     )
 
 
@@ -108,6 +173,8 @@ def _analyze_section(key: str, title: str, text: str) -> SectionMetrics:
     term_candidates = _extract_term_candidates(text)
     issues = _detect_section_issues(text, char_count, avg_sentence_length)
 
+    is_placeholder, placeholder_reason = _detect_placeholder(text, char_count)
+
     return SectionMetrics(
         key=key,
         title=title,
@@ -118,6 +185,8 @@ def _analyze_section(key: str, title: str, text: str) -> SectionMetrics:
         repeat_phrases=repeat_phrases,
         term_candidates=term_candidates,
         issues=issues,
+        is_placeholder=is_placeholder,
+        placeholder_reason=placeholder_reason,
     )
 
 

@@ -34,7 +34,15 @@ def create_edit_plan(
         schema=_EDIT_PLAN_SCHEMA,
     )
 
-    return _parse_edit_plan(result.data, level)
+    plan = _parse_edit_plan(result.data, level)
+
+    placeholder_keys = set(quality_report.placeholder_sections)
+    plan.sections_to_edit = [
+        s for s in plan.sections_to_edit
+        if s.key not in placeholder_keys
+    ]
+
+    return plan
 
 
 def _quality_report_to_metrics(report: QualityReport) -> dict:
@@ -43,6 +51,7 @@ def _quality_report_to_metrics(report: QualityReport) -> dict:
         "total_words": report.total_words,
         "short_sections": report.short_sections,
         "empty_sections": report.empty_sections,
+        "placeholder_sections": report.placeholder_sections,
         "global_repeats": [
             {"phrase": r.phrase, "count": r.count}
             for r in report.global_repeats[:10]
@@ -53,6 +62,8 @@ def _quality_report_to_metrics(report: QualityReport) -> dict:
                 "key": s.key,
                 "chars": s.char_count,
                 "issues": s.issues,
+                "is_placeholder": s.is_placeholder,
+                "placeholder_reason": s.placeholder_reason,
             }
             for s in report.sections
         ],

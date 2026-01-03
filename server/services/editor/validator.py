@@ -126,6 +126,8 @@ def quality_report_to_dict(report: QualityReport) -> dict:
                 ],
                 "term_candidates": s.term_candidates[:10],
                 "issues": s.issues,
+                "is_placeholder": s.is_placeholder,
+                "placeholder_reason": s.placeholder_reason,
             }
             for s in report.sections
         ],
@@ -140,6 +142,7 @@ def quality_report_to_dict(report: QualityReport) -> dict:
         "term_candidates": report.term_candidates[:30],
         "short_sections": report.short_sections,
         "empty_sections": report.empty_sections,
+        "placeholder_sections": report.placeholder_sections,
         "style_issues": report.style_issues,
         "style_marker_counts": report.style_marker_counts,
         "total_style_markers": sum(report.style_marker_counts.values()),
