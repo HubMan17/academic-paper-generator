@@ -292,7 +292,7 @@ def get_pipeline_sections(request):
 )
 @api_view(['POST'])
 def run_pipeline_sync(request, document_id):
-    import asyncio
+    from asgiref.sync import async_to_sync
 
     doc = get_object_or_404(Document, id=document_id)
 
@@ -331,12 +331,10 @@ def run_pipeline_sync(request, document_id):
             service = EditorService()
             edit_level = EditLevel(level)
 
-            result = asyncio.run(
-                service.run_full_pipeline(
-                    document_id=document_id,
-                    level=edit_level,
-                    force=False,
-                )
+            result = async_to_sync(service.run_full_pipeline)(
+                document_id=document_id,
+                level=edit_level,
+                force=False,
             )
 
             return Response({
