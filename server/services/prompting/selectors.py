@@ -2,6 +2,16 @@ from typing import Any
 from .schema import SectionSpec, FactRef
 
 
+def _evidence_to_strings(evidence: list[Any]) -> list[str]:
+    result = []
+    for e in evidence:
+        if isinstance(e, dict):
+            result.append(e.get("path", str(e)))
+        else:
+            result.append(str(e))
+    return result
+
+
 def _extract_facts_from_analyzer(facts: dict[str, Any]) -> list[dict[str, Any]]:
     extracted = []
 
@@ -38,12 +48,13 @@ def _extract_facts_from_analyzer(facts: dict[str, Any]) -> list[dict[str, Any]]:
         arch_type = arch.get("type", "unknown")
         confidence = arch.get("confidence", 0)
         evidence = arch.get("evidence", [])
+        evidence_strs = _evidence_to_strings(evidence)
         extracted.append({
             "id": "architecture",
             "tags": ["architecture", "layers", "infra"],
             "key_path": "architecture.type",
             "text": f"Architecture: {arch_type} (confidence: {confidence:.0%})",
-            "details": ", ".join(evidence) if evidence else "No evidence"
+            "details": ", ".join(evidence_strs) if evidence_strs else "No evidence"
         })
 
     for i, mod in enumerate(facts.get("modules", [])):

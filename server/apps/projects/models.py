@@ -89,6 +89,7 @@ class DocumentArtifact(models.Model):
         SECTION_SUMMARY = 'section_summary', 'Section Summary'
         CONTEXT_PACK = 'context_pack', 'Context Pack'
         TRACE = 'trace', 'Generation Trace'
+        LLM_TRACE = 'llm_trace', 'LLM Call Trace'
 
     class Format(models.TextChoices):
         JSON = 'json', 'JSON'
