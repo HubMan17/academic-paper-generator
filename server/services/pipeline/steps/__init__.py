@@ -6,6 +6,7 @@ from services.pipeline.steps.document_assemble import ensure_document_draft
 from services.pipeline.steps.toc import ensure_toc
 from services.pipeline.steps.quality import ensure_quality_report
 from services.pipeline.steps.enrichment import ensure_enrichment, ensure_section_enrichment
+from services.pipeline.steps.literature import ensure_literature, format_literature_text
 
 __all__ = [
     "ensure_outline",
@@ -19,4 +20,6 @@ __all__ = [
     "ensure_quality_report",
     "ensure_enrichment",
     "ensure_section_enrichment",
+    "ensure_literature",
+    "format_literature_text",
 ]
