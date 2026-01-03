@@ -7,7 +7,7 @@ from django.db import transaction
 
 from apps.projects.models import Document, DocumentArtifact, Section
 from services.llm import LLMClient
-from services.pipeline.ensure import ensure_artifact, get_success_artifact
+from services.pipeline.ensure import ensure_artifact, get_success_artifact, invalidate_assembly_artifacts
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.profiles import get_profile
 from services.pipeline.specs import get_section_spec
@@ -159,6 +159,8 @@ def ensure_section(
         }
 
     try:
+        existing_artifact = get_success_artifact(document_id, section_kind)
+
         artifact = ensure_artifact(
             document_id=document_id,
             kind=section_kind,
@@ -167,6 +169,13 @@ def ensure_section(
             job_id=job_id,
             section_key=section_key,
         )
+
+        is_new_artifact = artifact.id != (existing_artifact.id if existing_artifact else None)
+
+        if is_new_artifact:
+            invalidated = invalidate_assembly_artifacts(document_id)
+            if invalidated:
+                logger.info(f"Section {section_key} regenerated, invalidated: {invalidated}")
 
         with transaction.atomic():
             section.text_current = artifact.content_text or ""

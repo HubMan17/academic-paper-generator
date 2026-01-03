@@ -59,6 +59,13 @@ def ensure_context_pack(
         facts = get_facts(document)
         summaries = get_previous_summaries(document, section_key, limit=3)
 
+        local_outline = None
+        if outline and "sections" in outline:
+            for sec in outline.get("sections", []):
+                if sec.get("key") == section_key:
+                    local_outline = sec
+                    break
+
         global_context = f"Проект: {document.params.get('title', 'Анализ ПО')}\nТип документа: {document.get_type_display()}"
 
         prompting_spec = spec.to_prompting_spec() if spec else None
@@ -87,7 +94,9 @@ def ensure_context_pack(
                 "count": len(context_pack.debug.selected_fact_refs),
             },
             "outline_excerpt": context_pack.layers.outline_excerpt,
+            "local_outline": local_outline,
             "summaries_used": [s["section_key"] for s in summaries],
+            "summaries_content": summaries,
             "layers": {
                 "global_context": context_pack.layers.global_context,
                 "outline_excerpt": context_pack.layers.outline_excerpt,

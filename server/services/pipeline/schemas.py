@@ -62,6 +62,18 @@ class QualityIssue:
 
 
 @dataclass
+class SectionCoverage:
+    key: str
+    title: str
+    required: bool
+    present: bool
+    word_count: int = 0
+    target_min: int = 0
+    target_max: int = 0
+    status: str = "missing"  # missing, short, ok, long
+
+
+@dataclass
 class QualityStats:
     total_words: int = 0
     total_chars: int = 0
@@ -69,6 +81,12 @@ class QualityStats:
     section_words: dict[str, int] = field(default_factory=dict)
     avg_words_per_section: float = 0.0
     duration_ms: int | None = None
+    required_sections_total: int = 0
+    required_sections_present: int = 0
+    coverage_percent: float = 0.0
+    target_words_min: int = 0
+    target_words_max: int = 0
+    sections_coverage: list[SectionCoverage] = field(default_factory=list)
 
 
 @dataclass
@@ -171,6 +189,24 @@ def quality_report_to_dict(report: QualityReport) -> dict:
             "section_words": report.stats.section_words,
             "avg_words_per_section": report.stats.avg_words_per_section,
             "duration_ms": report.stats.duration_ms,
+            "required_sections_total": report.stats.required_sections_total,
+            "required_sections_present": report.stats.required_sections_present,
+            "coverage_percent": report.stats.coverage_percent,
+            "target_words_min": report.stats.target_words_min,
+            "target_words_max": report.stats.target_words_max,
+            "sections_coverage": [
+                {
+                    "key": sc.key,
+                    "title": sc.title,
+                    "required": sc.required,
+                    "present": sc.present,
+                    "word_count": sc.word_count,
+                    "target_min": sc.target_min,
+                    "target_max": sc.target_max,
+                    "status": sc.status,
+                }
+                for sc in report.stats.sections_coverage
+            ],
         },
         "generated_at": report.generated_at.isoformat() if report.generated_at else None,
     }
