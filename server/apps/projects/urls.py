@@ -22,6 +22,7 @@ urlpatterns = [
     path('sections/', views.sections_registry, name='sections_registry'),
 
     path('documents/<uuid:document_id>/pipeline/run/', pipeline_views.run_pipeline, name='run_pipeline'),
+    path('documents/<uuid:document_id>/pipeline/run-sync/', pipeline_views.run_pipeline_sync, name='run_pipeline_sync'),
     path('documents/<uuid:document_id>/pipeline/status/', pipeline_views.pipeline_status, name='pipeline_status'),
     path('documents/<uuid:document_id>/pipeline/draft/', pipeline_views.get_document_draft, name='get_document_draft'),
     path('documents/<uuid:document_id>/pipeline/toc/', pipeline_views.get_toc, name='get_toc'),
@@ -29,4 +30,5 @@ urlpatterns = [
 
     path('pipeline/profiles/', pipeline_views.get_profiles, name='get_profiles'),
     path('pipeline/sections/', pipeline_views.get_pipeline_sections, name='get_pipeline_sections'),
+    path('pipeline/test-document/', pipeline_views.create_test_document, name='create_test_document'),
 ]

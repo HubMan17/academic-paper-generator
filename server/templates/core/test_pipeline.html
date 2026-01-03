@@ -32,21 +32,25 @@
                     </div>
 
                     <div class="flex space-x-2">
-                        <button onclick="runDocument()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">
-                            Run Document
+                        <button onclick="runDocument()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm" title="Requires Celery + Redis">
+                            Run (Celery)
                         </button>
-                        <button onclick="resumeDocument()" class="flex-1 bg-yellow-600 text-white py-2 px-4 rounded-lg hover:bg-yellow-700 text-sm">
-                            Resume
+                        <button onclick="runDocumentSync()" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 text-sm" title="Synchronous, no Celery needed">
+                            Run Sync
                         </button>
                     </div>
 
                     <button onclick="loadStatus()" class="w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 text-sm">
                         Refresh Status
                     </button>
+
+                    <button onclick="createTestDocument()" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 text-sm">
+                        Create Test Document
+                    </button>
                 </div>
 
                 <div id="statusInfo" class="mt-4 text-sm">
-                    <p class="text-gray-500">Enter Document ID and click Refresh</p>
+                    <p class="text-gray-500">Click "Create Test Document" to start</p>
                 </div>
             </div>
 
@@ -125,7 +129,7 @@
     </div>
 
     <script>
-        const API_BASE = '/api/v1/projects';
+        const API_BASE = '/api/v1';
 
         function showLoading(text = 'Processing...') {
             document.getElementById('loadingText').textContent = text;
@@ -150,6 +154,28 @@
             return document.getElementById('profileSelect').value;
         }
 
+        async function createTestDocument() {
+            showLoading('Creating test document...');
+            try {
+                const resp = await fetch(`${API_BASE}/pipeline/test-document/`, { method: 'POST' });
+                const data = await resp.json();
+                if (resp.ok) {
+                    document.getElementById('documentId').value = data.document_id;
+                    document.getElementById('statusInfo').innerHTML = `
+                        <p class="text-green-600">Test document created!</p>
+                        <p class="text-xs text-gray-500 font-mono">${data.document_id}</p>
+                    `;
+                    await loadStatus();
+                } else {
+                    showError(data.error || 'Failed to create test document');
+                }
+            } catch (e) {
+                showError(e.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
         function showResultTab(name) {
             document.querySelectorAll('.result-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.result-tab').forEach(el => {
@@ -172,6 +198,30 @@
                 const data = await resp.json();
                 if (resp.ok) {
                     document.getElementById('statusInfo').innerHTML = `<p class="text-green-600">Job queued: ${data.job_id}</p>`;
+                } else {
+                    showError(data.error || 'Failed');
+                }
+            } catch (e) {
+                showError(e.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function runDocumentSync() {
+            const docId = getDocumentId();
+            if (!docId) { showError('Enter Document ID'); return; }
+
+            showLoading('Running document generation (sync)...');
+            try {
+                const resp = await fetch(`${API_BASE}/documents/${docId}/pipeline/run-sync/?step=document&profile=${getProfile()}`, { method: 'POST' });
+                const data = await resp.json();
+                if (resp.ok) {
+                    document.getElementById('statusInfo').innerHTML = `
+                        <p class="text-green-600">Generation complete!</p>
+                        <p class="text-xs">Created: ${data.artifacts_created?.length || 0}, Cached: ${data.artifacts_cached?.length || 0}</p>
+                    `;
+                    await loadStatus();
                 } else {
                     showError(data.error || 'Failed');
                 }
