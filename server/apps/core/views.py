@@ -287,11 +287,11 @@ def pipeline_run_api(request):
 
     try:
         if mock_mode:
-            from services.pipeline.work_types import WORK_TYPE_PRESETS
+            from services.pipeline.work_types import WORK_TYPE_REGISTRY
 
-            preset = WORK_TYPE_PRESETS.get(work_type)
+            preset = WORK_TYPE_REGISTRY.get(work_type)
             if not preset:
-                preset = WORK_TYPE_PRESETS['referat']
+                preset = WORK_TYPE_REGISTRY['referat']
 
             mock_outline = {
                 "chapters": [
@@ -381,9 +381,93 @@ def pipeline_run_api(request):
                 "mock": True
             }
         else:
+            from apps.projects.models import (
+                Project, AnalysisRun, Artifact, Document, DocumentProfile, Section
+            )
+            from services.pipeline import DocumentRunner
+            from services.pipeline.kinds import ArtifactKind
+            from services.pipeline.ensure import get_success_artifact
+
+            project, _ = Project.objects.get_or_create(
+                name="Test Pipeline Project",
+                defaults={"repo_url": "https://github.com/test/test"}
+            )
+
+            analysis_run = AnalysisRun.objects.create(
+                project=project,
+                repo_url=project.repo_url,
+                status=AnalysisRun.Status.SUCCESS
+            )
+
+            if facts:
+                Artifact.objects.create(
+                    analysis_run=analysis_run,
+                    kind=Artifact.Kind.FACTS,
+                    data=facts
+                )
+
+            doc_profile = DocumentProfile.objects.create(
+                work_type=work_type,
+                topic_title=topic_title,
+                topic_description=topic_description or "",
+                style_level=2 if work_type == 'course' else (3 if work_type == 'diploma' else 1),
+            )
+
+            document = Document.objects.create(
+                analysis_run=analysis_run,
+                profile=doc_profile,
+                type=work_type,
+                params={"title": topic_title, "description": topic_description},
+            )
+
+            runner = DocumentRunner(
+                document_id=document.id,
+                profile=profile,
+                mock_mode=False,
+            )
+            run_result = runner.run_full()
+
+            outline_artifact = get_success_artifact(document.id, ArtifactKind.OUTLINE.value)
+            outline_data = outline_artifact.data_json if outline_artifact else {}
+
+            sections_data = []
+            total_words = 0
+            for section in Section.objects.filter(document=document).order_by('order'):
+                text = section.edited_text or section.enriched_text or section.text_current or ""
+                word_count = len(text.split())
+                sections_data.append({
+                    "chapter_key": section.chapter_key,
+                    "title": section.title,
+                    "text": text,
+                    "word_count": word_count
+                })
+                total_words += word_count
+
+            literature_artifact = get_success_artifact(document.id, ArtifactKind.LITERATURE.value)
+            literature_data = literature_artifact.data_json if literature_artifact else {}
+
+            quality_artifact = get_success_artifact(document.id, ArtifactKind.QUALITY_REPORT.value)
+            quality_data = quality_artifact.data_json if quality_artifact else {}
+
             result = {
-                "error": "Real pipeline execution not implemented in test API",
-                "mock": False
+                "outline": outline_data,
+                "sections": sections_data,
+                "sections_count": len(sections_data),
+                "total_words": total_words,
+                "literature": literature_data,
+                "sources_count": len(literature_data.get('sources', [])),
+                "quality_report": quality_data,
+                "work_type": work_type,
+                "profile": profile,
+                "mock": False,
+                "document_id": str(document.id),
+                "run_result": {
+                    "success": run_result.success,
+                    "artifacts_created": run_result.artifacts_created,
+                    "artifacts_cached": run_result.artifacts_cached,
+                    "errors": run_result.errors,
+                    "duration_ms": run_result.duration_ms,
+                }
             }
 
         return Response({
