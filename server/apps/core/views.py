@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema
 from services.analyzer import RepoAnalyzer
 from services.llm import LLMClient
 from services.llm.errors import LLMError
+from services.prompting import slice_for_section
 from apps.llm.models import LLMCall
 from .serializers import (
     AnalyzeRequestSerializer,
@@ -191,3 +192,76 @@ def llm_clear_cache_api(request):
         "status": "success",
         "deleted": deleted,
     })
+
+
+@extend_schema(
+    responses={200: dict},
+    description="Создаёт ContextPack для секции документа",
+    tags=["Prompting"]
+)
+@api_view(['POST'])
+def prompting_slice_api(request):
+    section_key = request.data.get('section_key')
+    facts = request.data.get('facts', {})
+    outline = request.data.get('outline', {})
+    summaries = request.data.get('summaries', [])
+    global_context = request.data.get('global_context', '')
+
+    if not section_key:
+        return Response(
+            {"status": "error", "error": "section_key is required", "context_pack": None},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        context_pack = slice_for_section(
+            section_key=section_key,
+            facts=facts,
+            outline=outline,
+            summaries=summaries,
+            global_context=global_context
+        )
+
+        pack_data = {
+            "section_key": context_pack.section_key,
+            "layers": {
+                "global_context": context_pack.layers.global_context,
+                "outline_excerpt": context_pack.layers.outline_excerpt,
+                "facts_slice": context_pack.layers.facts_slice,
+                "summaries": context_pack.layers.summaries,
+                "constraints": context_pack.layers.constraints
+            },
+            "rendered_prompt": {
+                "system": context_pack.rendered_prompt.system,
+                "user": context_pack.rendered_prompt.user
+            },
+            "budget": {
+                "max_input_tokens_approx": context_pack.budget.max_input_tokens_approx,
+                "max_output_tokens": context_pack.budget.max_output_tokens,
+                "soft_char_limit": context_pack.budget.soft_char_limit
+            },
+            "debug": {
+                "selected_fact_refs": [
+                    {"fact_id": ref.fact_id, "reason": ref.reason, "weight": ref.weight}
+                    for ref in context_pack.debug.selected_fact_refs
+                ],
+                "selection_reason": context_pack.debug.selection_reason,
+                "trims_applied": context_pack.debug.trims_applied
+            }
+        }
+
+        return Response({
+            "status": "success",
+            "context_pack": pack_data,
+            "error": None
+        })
+    except ValueError as e:
+        return Response(
+            {"status": "error", "error": str(e), "context_pack": None},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {"status": "error", "error": str(e), "context_pack": None},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
