@@ -1,6 +1,7 @@
 import uuid
 from typing import Optional
 from django.db import transaction
+from asgiref.sync import sync_to_async
 
 from apps.projects.models import Document, Section, DocumentArtifact
 from services.llm import LLMClient
@@ -53,20 +54,22 @@ class EditorService:
         level: EditLevel = EditLevel.LEVEL_1,
         force: bool = False,
     ) -> DocumentEdited:
-        document = Document.objects.select_related('analysis_run').get(id=document_id)
+        document = await sync_to_async(
+            Document.objects.select_related('analysis_run').get
+        )(id=document_id)
 
         if document.status == Document.Status.FINALIZED and not force:
-            existing = self._get_existing_document_edited(document)
+            existing = await sync_to_async(self._get_existing_document_edited)(document)
             if existing:
                 return existing
 
         document.status = Document.Status.EDITING
-        document.save(update_fields=['status'])
+        await sync_to_async(document.save)(update_fields=['status'])
 
         try:
-            sections = self._get_sections_data(document)
-            outline = self._get_outline(document)
-            summaries = self._get_section_summaries(document)
+            sections = await sync_to_async(self._get_sections_data)(document)
+            outline = await sync_to_async(self._get_outline)(document)
+            summaries = await sync_to_async(self._get_section_summaries)(document)
             idempotency_prefix = f"edit:{document_id}"
 
             quality_report_v1 = await self.step_analyze(document, sections)
@@ -108,13 +111,13 @@ class EditorService:
             document_edited.quality_report_v2 = quality_report_v2
 
             document.status = Document.Status.FINALIZED
-            document.save(update_fields=['status', 'updated_at'])
+            await sync_to_async(document.save)(update_fields=['status', 'updated_at'])
 
             return document_edited
 
         except Exception as e:
             document.status = Document.Status.ERROR
-            document.save(update_fields=['status'])
+            await sync_to_async(document.save)(update_fields=['status'])
             raise
 
     async def step_analyze(
@@ -124,7 +127,7 @@ class EditorService:
     ) -> QualityReport:
         quality_report = analyze_document(sections)
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.QUALITY_REPORT,
             data_json=quality_report_to_dict(quality_report),
@@ -151,7 +154,7 @@ class EditorService:
             idempotency_key=f"{idempotency_prefix}:plan",
         )
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.EDIT_PLAN,
             data_json=edit_plan_to_dict(edit_plan),
@@ -173,7 +176,7 @@ class EditorService:
             idempotency_key=f"{idempotency_prefix}:glossary",
         )
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.GLOSSARY,
             data_json=glossary_to_dict(glossary),
@@ -181,7 +184,7 @@ class EditorService:
 
         _, consistency_report = apply_glossary(sections, glossary)
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.CONSISTENCY_REPORT,
             data_json=consistency_report_to_dict(consistency_report),
@@ -230,7 +233,7 @@ class EditorService:
         idempotency_prefix: str,
     ) -> dict[str, SectionEdited]:
         edited_sections: dict[str, SectionEdited] = {}
-        completed_keys = self._get_completed_section_edits(document)
+        completed_keys = await sync_to_async(self._get_completed_section_edits)(document)
 
         sections_by_key = {s["key"]: s for s in sections}
         ordered_keys = [s["key"] for s in sections]
@@ -258,9 +261,9 @@ class EditorService:
                 next_key = ordered_keys[key_index + 1]
                 next_text = sections_by_key[next_key].get("text", "")
 
-            db_section = Section.objects.filter(
-                document=document, key=key
-            ).first()
+            db_section = await sync_to_async(
+                Section.objects.filter(document=document, key=key).first
+            )()
 
             result = await edit_section(
                 llm_client=self.llm_client,
@@ -274,7 +277,7 @@ class EditorService:
                 idempotency_key=f"{idempotency_prefix}:section:{key}",
             )
 
-            self._save_artifact(
+            await sync_to_async(self._save_artifact)(
                 document=document,
                 section=db_section,
                 kind=DocumentArtifact.Kind.SECTION_EDITED,
@@ -300,7 +303,7 @@ class EditorService:
             idempotency_prefix=idempotency_prefix,
         )
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.TRANSITIONS,
             data_json=transitions_to_dict(transitions),
@@ -322,7 +325,7 @@ class EditorService:
             idempotency_prefix=idempotency_prefix,
         )
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.CHAPTER_CONCLUSIONS,
             data_json=chapter_conclusions_to_dict(conclusions),
@@ -345,7 +348,7 @@ class EditorService:
         if not conclusion_section:
             return None
 
-        outline = self._get_outline(document)
+        outline = await sync_to_async(self._get_outline)(document)
         document_title = outline.get("title", "Документ")
 
         return await generate_final_conclusion(
@@ -373,7 +376,7 @@ class EditorService:
             final_conclusion=final_conclusion,
         )
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.DOCUMENT_EDITED,
             data_json=document_edited_to_dict(document_edited),
@@ -391,7 +394,7 @@ class EditorService:
 
         comparison = compare_quality_reports(quality_report_v1, quality_report_v2)
 
-        self._save_artifact(
+        await sync_to_async(self._save_artifact)(
             document=document,
             kind=DocumentArtifact.Kind.QUALITY_REPORT,
             data_json={
@@ -506,14 +509,16 @@ async def edit_single_section(
     force: bool = False,
 ) -> SectionEdited:
     service = EditorService()
-    document = Document.objects.get(id=document_id)
+    document = await sync_to_async(Document.objects.get)(id=document_id)
 
     if not force:
-        existing = DocumentArtifact.objects.filter(
-            document=document,
-            section__key=section_key,
-            kind=DocumentArtifact.Kind.SECTION_EDITED,
-        ).first()
+        existing = await sync_to_async(
+            DocumentArtifact.objects.filter(
+                document=document,
+                section__key=section_key,
+                kind=DocumentArtifact.Kind.SECTION_EDITED,
+            ).first
+        )()
         if existing and existing.content_text:
             return SectionEdited(
                 key=section_key,
@@ -522,9 +527,9 @@ async def edit_single_section(
                 changes_made=["Loaded from cache"],
             )
 
-    sections = service._get_sections_data(document)
-    outline = service._get_outline(document)
-    summaries = service._get_section_summaries(document)
+    sections = await sync_to_async(service._get_sections_data)(document)
+    outline = await sync_to_async(service._get_outline)(document)
+    summaries = await sync_to_async(service._get_section_summaries)(document)
 
     quality_report = analyze_document(sections)
 
@@ -573,11 +578,11 @@ async def edit_single_section(
         level=level,
     )
 
-    db_section = Section.objects.filter(
-        document=document, key=section_key
-    ).first()
+    db_section = await sync_to_async(
+        Section.objects.filter(document=document, key=section_key).first
+    )()
 
-    service._save_artifact(
+    await sync_to_async(service._save_artifact)(
         document=document,
         section=db_section,
         kind=DocumentArtifact.Kind.SECTION_EDITED,
