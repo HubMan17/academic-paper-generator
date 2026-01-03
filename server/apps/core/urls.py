@@ -14,4 +14,5 @@ api_v1_urlpatterns = [
     path('llm/json/', views.llm_generate_json_api, name='llm_generate_json'),
     path('llm/stats/', views.llm_stats_api, name='llm_stats'),
     path('llm/clear/', views.llm_clear_cache_api, name='llm_clear_cache'),
+    path('prompting/slice/', views.prompting_slice_api, name='prompting_slice'),
 ]
