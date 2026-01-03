@@ -15,7 +15,7 @@ class TestEstimateCost:
 
     def test_unknown_model_uses_default(self):
         cost = estimate_cost("unknown-model", 1000, 1000)
-        expected = (1000 / 1000) * 0.00015 + (1000 / 1000) * 0.0006
+        expected = (1000 / 1000) * 0.005 + (1000 / 1000) * 0.015
         assert cost == round(expected, 6)
 
     def test_zero_tokens(self):
