@@ -27,6 +27,10 @@ def test_analyzer_page(request):
     return render(request, 'core/test_analyzer.html')
 
 
+def dev_pipeline_page(request):
+    return render(request, 'dev/pipeline.html')
+
+
 @extend_schema(
     request=AnalyzeRequestSerializer,
     responses={200: AnalyzeResponseSerializer},
