@@ -441,7 +441,7 @@ def get_edit_plan(request, document_id):
 @api_view(['POST'])
 def create_test_document(request):
     project = Project.objects.create(
-        repo_url="https://github.com/test/sample-repo",
+        repo_url="https://github.com/HubMan17/academic-paper-generator",
     )
 
     analysis_run = AnalysisRun.objects.create(
@@ -453,65 +453,67 @@ def create_test_document(request):
         analysis_run=analysis_run,
         kind=Artifact.Kind.FACTS,
         data={
+            "schema": "facts.v1",
             "repo": {
-                "url": "https://github.com/test/sample-repo",
-                "commit": "abc123def456",
-                "detected_at": "2024-01-01T00:00:00Z",
+                "url": "https://github.com/HubMan17/academic-paper-generator",
+                "commit": "8802cc6a07a73677ae3c2ed490a2fa383ff1bd69",
+                "detected_at": "2026-01-03T20:37:18.786192Z",
             },
             "languages": [
-                {"name": "Python", "ratio": 0.7, "lines_of_code": 5000},
-                {"name": "JavaScript", "ratio": 0.2, "lines_of_code": 1500},
-                {"name": "HTML", "ratio": 0.1, "lines_of_code": 500},
+                {"name": "Python", "ratio": 0.97, "lines_of_code": 5704, "evidence": [{"path": "*.py"}]},
+                {"name": "TypeScript", "ratio": 0.03, "lines_of_code": 158, "evidence": [{"path": "*.ts"}, {"path": "*.tsx"}]},
+                {"name": "JavaScript", "ratio": 0, "lines_of_code": 16, "evidence": [{"path": "*.js"}, {"path": "*.jsx"}]},
             ],
             "frameworks": [
-                {"name": "Django", "type": "backend", "version": "5.0"},
-                {"name": "Django REST Framework", "type": "backend", "version": "3.14"},
-                {"name": "React", "type": "frontend", "version": "18.2"},
+                {"name": "Django", "type": "web", "evidence": [{"path": "server/requirements.txt"}]},
+                {"name": "Celery", "type": "task-queue", "evidence": [{"path": "server/requirements.txt"}]},
+                {"name": "pytest", "type": "testing", "evidence": [{"path": "server/requirements.txt"}]},
+                {"name": "React", "type": "frontend", "evidence": [{"path": "client/package.json"}]},
+                {"name": "TailwindCSS", "type": "styling", "evidence": [{"path": "client/package.json"}]},
             ],
             "architecture": {
-                "type": "layered",
-                "layers": ["api", "services", "models"],
-                "evidence": [
-                    {"path": "server/apps/", "description": "Django apps"},
-                    {"path": "server/services/", "description": "Business logic"},
-                    {"path": "client/src/", "description": "React frontend"},
-                ],
+                "type": "client-server",
+                "layers": ["frontend", "backend"],
+                "details": {"separation": "monorepo", "api_type": "REST"},
+                "evidence": [{"path": "client", "lines": []}, {"path": "server", "lines": []}],
             },
             "modules": [
-                {"path": "server/apps/core/", "type": "app", "name": "core"},
-                {"path": "server/apps/projects/", "type": "app", "name": "projects"},
-                {"path": "server/services/llm/", "type": "service", "name": "llm"},
-                {"path": "server/services/analyzer/", "type": "service", "name": "analyzer"},
+                {"name": "apps", "role": "module", "path": "server/apps", "submodules": ["accounts:submodule", "core:submodule", "llm:submodule", "projects:submodule"]},
+                {"name": "config", "role": "configuration", "path": "server/config", "submodules": []},
+                {"name": "services", "role": "business-logic", "path": "server/services", "submodules": ["analyzer:submodule", "documents:submodule", "llm:submodule", "prompting:submodule"]},
+                {"name": "tasks", "role": "module", "path": "server/tasks", "submodules": []},
+                {"name": "templates", "role": "templates", "path": "server/templates", "submodules": ["core:submodule", "dev:submodule"]},
+                {"name": "tests", "role": "testing", "path": "server/tests", "submodules": ["test_analyzer:submodule", "test_documents:submodule", "test_llm:submodule", "test_prompting:submodule"]},
+                {"name": "public", "role": "static-files", "path": "client/public", "submodules": []},
+                {"name": "src", "role": "module", "path": "client/src", "submodules": ["components:ui-components", "hooks:react-hooks", "pages:pages", "services:business-logic", "types:type-definitions"]},
+                {"name": "docs", "role": "top-level", "path": "docs", "submodules": []},
             ],
-            "dependencies": {
-                "backend": [
-                    {"name": "django", "version": "5.0"},
-                    {"name": "djangorestframework", "version": "3.14"},
-                    {"name": "celery", "version": "5.3"},
-                    {"name": "openai", "version": "1.0"},
+            "api": {"endpoints": [], "total_count": 0},
+            "frontend_routes": [{"path": "/", "name": "", "component": "", "file": "client/src/App.tsx", "auth_required": False}],
+            "models": [],
+            "runtime": {
+                "dependencies": [
+                    {"name": "django", "version": ">=5.0"},
+                    {"name": "djangorestframework", "version": ">=3.14"},
+                    {"name": "drf-spectacular", "version": ">=0.27"},
+                    {"name": "celery", "version": ">=5.3"},
+                    {"name": "redis", "version": ">=5.0"},
+                    {"name": "python-dotenv", "version": ">=1.0"},
+                    {"name": "django-cors-headers", "version": ">=4.3"},
+                    {"name": "pytest", "version": ">=8.0"},
+                    {"name": "pytest-django", "version": ">=4.7"},
+                    {"name": "pytest-mock", "version": ">=3.0"},
+                    {"name": "openai", "version": ">=1.0"},
+                    {"name": "jsonschema", "version": ">=4.0"},
+                    {"name": "react", "version": "^18.2.0"},
+                    {"name": "react-dom", "version": "^18.2.0"},
+                    {"name": "react-router-dom", "version": "^6.20.0"},
+                    {"name": "tailwindcss", "version": "^3.4.0"},
+                    {"name": "typescript", "version": "^5.3.3"},
+                    {"name": "vite", "version": "^5.0.10"},
                 ],
-                "frontend": [
-                    {"name": "react", "version": "18.2"},
-                    {"name": "tailwindcss", "version": "3.4"},
-                ],
-            },
-            "api": {
-                "endpoints": [
-                    {"method": "POST", "path": "/api/v1/analyze/", "description": "Start analysis"},
-                    {"method": "GET", "path": "/api/v1/jobs/{id}/", "description": "Get job status"},
-                    {"method": "POST", "path": "/api/v1/documents/", "description": "Create document"},
-                    {"method": "GET", "path": "/api/v1/documents/{id}/", "description": "Get document"},
-                ],
-            },
-            "models": [
-                {"name": "Project", "app": "projects", "fields": ["name", "repo_url"]},
-                {"name": "Document", "app": "projects", "fields": ["type", "language", "status"]},
-                {"name": "Section", "app": "projects", "fields": ["key", "title", "content"]},
-            ],
-            "testing": {
-                "framework": "pytest",
-                "coverage": 75,
-                "test_count": 120,
+                "build_files": ["client/package.json", "client/tsconfig.json", "client/vite.config.ts"],
+                "entrypoints": ["server/manage.py", "server/config/wsgi.py", "client/src/types/index.ts"],
             },
         }
     )
