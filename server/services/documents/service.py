@@ -306,7 +306,8 @@ class DocumentService:
             "budget": {
                 "max_input_tokens_approx": context_pack.budget.max_input_tokens_approx,
                 "max_output_tokens": context_pack.budget.max_output_tokens,
-                "soft_char_limit": context_pack.budget.soft_char_limit
+                "soft_char_limit": context_pack.budget.soft_char_limit,
+                "estimated_input_tokens": context_pack.budget.estimated_input_tokens
             },
             "debug": {
                 "selected_fact_refs": [

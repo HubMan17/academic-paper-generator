@@ -14,6 +14,7 @@ class Budget:
     max_input_tokens_approx: int
     max_output_tokens: int
     soft_char_limit: int
+    estimated_input_tokens: int = 0
 
 
 @dataclass

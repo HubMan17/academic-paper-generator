@@ -89,15 +89,50 @@ def _extract_outline_excerpt(
     if not sections:
         return ""
 
+    title = outline.get("title", "")
+
     if mode == OutlineMode.PARENTS_ONLY:
-        headings = [s.get("title", "") for s in sections if s.get("title")]
-        return "\n".join(f"- {h}" for h in headings)
+        lines = []
+        if title:
+            lines.append(f"Название: {title}")
+            lines.append("")
+        lines.append("Структура:")
+        for i, s in enumerate(sections, 1):
+            s_title = s.get("title", "")
+            s_key = s.get("key", "")
+            marker = ">" if s_key == section_key else " "
+            lines.append(f"{marker} {i}. {s_title}")
+        return "\n".join(lines)
 
     if mode == OutlineMode.LOCAL:
-        for section in sections:
-            if section.get("key") == section_key:
-                return json.dumps(section, ensure_ascii=False, indent=2)
-        return ""
+        current_idx = None
+        for i, s in enumerate(sections):
+            if s.get("key") == section_key:
+                current_idx = i
+                break
+
+        if current_idx is None:
+            return ""
+
+        start = max(0, current_idx - 1)
+        end = min(len(sections), current_idx + 2)
+        window = sections[start:end]
+
+        lines = []
+        if title:
+            lines.append(f"Название: {title}")
+            lines.append("")
+
+        for s in window:
+            s_key = s.get("key", "")
+            s_title = s.get("title", "")
+            points = s.get("points", [])
+            marker = ">" if s_key == section_key else " "
+            lines.append(f"{marker} [{s_key}] {s_title}")
+            for p in points[:5]:
+                lines.append(f"    - {p}")
+
+        return "\n".join(lines)
 
     return ""
 

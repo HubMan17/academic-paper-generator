@@ -11,6 +11,12 @@ from .schema import (
 from .registry import get_section_spec, list_section_keys
 from .slicer import slice_for_section
 from .summarizer import make_summary_request, parse_summary_response
+from .tokens import (
+    TokenBudgetEstimator,
+    estimate_text_tokens,
+    estimate_json_tokens,
+    estimate_messages_tokens
+)
 
 __all__ = [
     "ContextPack",
@@ -26,4 +32,8 @@ __all__ = [
     "slice_for_section",
     "make_summary_request",
     "parse_summary_response",
+    "TokenBudgetEstimator",
+    "estimate_text_tokens",
+    "estimate_json_tokens",
+    "estimate_messages_tokens",
 ]
