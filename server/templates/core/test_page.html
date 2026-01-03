@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page - Academic Paper Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Academic Paper Generator</h1>
+        <p class="text-gray-600 mb-6">Тестовая страница для проверки функционала</p>
+
+        <div class="mb-6">
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-4">
+                    <button onclick="showTab('llm')" id="tab-llm" class="tab-btn px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600">
+                        LLM Client
+                    </button>
+                    <button onclick="showTab('analyzer')" id="tab-analyzer" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
+                        Analyzer
+                    </button>
+                    <button onclick="showTab('stats')" id="tab-stats" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">
+                        Статистика
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- LLM Tab -->
+        <div id="content-llm" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Text Generation -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Generate Text</h2>
+                    <form id="textForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                            <textarea id="textSystem" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" placeholder="You are a helpful assistant...">You are a helpful assistant.</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">User Prompt</label>
+                            <textarea id="textUser" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Write a haiku about programming...">Напиши короткое стихотворение о программировании.</textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                                <select id="textModel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                    <option value="">gpt-4o-mini (default)</option>
+                                    <option value="gpt-4o">gpt-4o</option>
+                                    <option value="gpt-4-turbo">gpt-4-turbo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Temperature</label>
+                                <input type="number" id="textTemp" value="0.7" min="0" max="2" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="textCache" checked class="mr-2">
+                            <label for="textCache" class="text-sm text-gray-700">Use Cache</label>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400">
+                            Generate Text
+                        </button>
+                    </form>
+                    <div id="textResult" class="mt-4 hidden">
+                        <h3 class="text-sm font-medium text-gray-700 mb-2">Result:</h3>
+                        <div id="textOutput" class="bg-gray-50 p-3 rounded-lg text-sm whitespace-pre-wrap"></div>
+                        <div id="textMeta" class="mt-2 text-xs text-gray-500"></div>
+                    </div>
+                </div>
+
+                <!-- JSON Generation -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Generate JSON</h2>
+                    <form id="jsonForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                            <textarea id="jsonSystem" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm">You are a helpful assistant that responds in JSON format.</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">User Prompt</label>
+                            <textarea id="jsonUser" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm">Создай список из 3 популярных языков программирования с полями: name, year, paradigm.</textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                                <select id="jsonModel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                    <option value="">gpt-4o-mini (default)</option>
+                                    <option value="gpt-4o">gpt-4o</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Temperature</label>
+                                <input type="number" id="jsonTemp" value="0.3" min="0" max="2" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="jsonCache" checked class="mr-2">
+                            <label for="jsonCache" class="text-sm text-gray-700">Use Cache</label>
+                        </div>
+                        <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400">
+                            Generate JSON
+                        </button>
+                    </form>
+                    <div id="jsonResult" class="mt-4 hidden">
+                        <h3 class="text-sm font-medium text-gray-700 mb-2">Result:</h3>
+                        <pre id="jsonOutput" class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                        <div id="jsonMeta" class="mt-2 text-xs text-gray-500"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error display -->
+            <div id="llmError" class="hidden mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                <h3 class="text-red-800 font-semibold mb-1">Error</h3>
+                <p id="llmErrorMessage" class="text-red-600 text-sm"></p>
+            </div>
+
+            <!-- Loading -->
+            <div id="llmLoading" class="hidden mt-6 bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-center space-x-2">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <span class="text-gray-600">Generating...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analyzer Tab -->
+        <div id="content-analyzer" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Repository Analyzer</h2>
+                <form id="analyzeForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">URL репозитория</label>
+                        <input type="url" id="repoUrl" placeholder="https://github.com/username/repository" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <button type="submit" id="analyzeBtn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400">
+                        Анализировать
+                    </button>
+                </form>
+            </div>
+
+            <div id="analyzeLoading" class="hidden bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex items-center justify-center space-x-2">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span class="text-gray-600">Анализируем репозиторий...</span>
+                </div>
+            </div>
+
+            <div id="analyzeError" class="hidden bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                <h3 class="text-red-800 font-semibold mb-2">Ошибка</h3>
+                <p id="analyzeErrorMessage" class="text-red-600"></p>
+            </div>
+
+            <div id="analyzeResults" class="hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Результаты анализа</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-blue-800 mb-1">Языки</h3>
+                            <p id="languagesCount" class="text-2xl font-bold text-blue-600">0</p>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-green-800 mb-1">Фреймворки</h3>
+                            <p id="frameworksCount" class="text-2xl font-bold text-green-600">0</p>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-purple-800 mb-1">Архитектура</h3>
+                            <p id="architectureType" class="text-lg font-bold text-purple-600">-</p>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <h3 class="text-lg font-medium text-gray-700 mb-2">Языки программирования</h3>
+                        <div id="languagesList" class="flex flex-wrap gap-2"></div>
+                    </div>
+                    <div class="mb-4">
+                        <h3 class="text-lg font-medium text-gray-700 mb-2">Фреймворки</h3>
+                        <div id="frameworksList" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">facts.json</h2>
+                        <button id="downloadBtn" class="bg-gray-600 text-white py-1 px-3 rounded hover:bg-gray-700 text-sm">
+                            Скачать JSON
+                        </button>
+                    </div>
+                    <details>
+                        <summary class="text-blue-600 hover:text-blue-800 cursor-pointer mb-2">Показать JSON</summary>
+                        <pre id="factsOutput" class="bg-gray-50 p-4 rounded-lg overflow-x-auto text-sm max-h-96 overflow-y-auto"></pre>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Tab -->
+        <div id="content-stats" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">LLM Statistics</h2>
+                    <div class="space-x-2">
+                        <button onclick="loadStats()" class="bg-blue-600 text-white py-1 px-3 rounded hover:bg-blue-700 text-sm">
+                            Refresh
+                        </button>
+                        <button onclick="clearCache()" class="bg-red-600 text-white py-1 px-3 rounded hover:bg-red-700 text-sm">
+                            Clear Cache
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                        <p class="text-2xl font-bold text-gray-800" id="statsTotal">-</p>
+                        <p class="text-sm text-gray-600">Total</p>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4 text-center">
+                        <p class="text-2xl font-bold text-green-600" id="statsSuccess">-</p>
+                        <p class="text-sm text-gray-600">Success</p>
+                    </div>
+                    <div class="bg-red-50 rounded-lg p-4 text-center">
+                        <p class="text-2xl font-bold text-red-600" id="statsFailed">-</p>
+                        <p class="text-sm text-gray-600">Failed</p>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-4 text-center">
+                        <p class="text-2xl font-bold text-yellow-600" id="statsInProgress">-</p>
+                        <p class="text-sm text-gray-600">In Progress</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-medium text-gray-700 mb-3">Recent Calls</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Fingerprint</th>
+                                <th class="px-4 py-2 text-left">Model</th>
+                                <th class="px-4 py-2 text-left">Status</th>
+                                <th class="px-4 py-2 text-left">Cost</th>
+                                <th class="px-4 py-2 text-left">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentCalls" class="divide-y">
+                            <tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let factsData = null;
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                el.classList.add('text-gray-500');
+            });
+
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            const btn = document.getElementById('tab-' + tabName);
+            btn.classList.remove('text-gray-500');
+            btn.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+
+            if (tabName === 'stats') loadStats();
+        }
+
+        // Text generation
+        document.getElementById('textForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            document.getElementById('llmLoading').classList.remove('hidden');
+            document.getElementById('llmError').classList.add('hidden');
+            document.getElementById('textResult').classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/v1/llm/text/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system: document.getElementById('textSystem').value,
+                        user: document.getElementById('textUser').value,
+                        model: document.getElementById('textModel').value || null,
+                        temperature: parseFloat(document.getElementById('textTemp').value),
+                        use_cache: document.getElementById('textCache').checked,
+                    }),
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    document.getElementById('textOutput').textContent = data.result.text;
+                    const meta = data.result.meta;
+                    document.getElementById('textMeta').innerHTML = `
+                        <span class="inline-block mr-3">Model: ${meta.model}</span>
+                        <span class="inline-block mr-3">Tokens: ${meta.total_tokens}</span>
+                        <span class="inline-block mr-3">Cost: $${meta.cost_estimate.toFixed(6)}</span>
+                        <span class="inline-block mr-3">Latency: ${meta.latency_ms}ms</span>
+                        <span class="inline-block ${meta.cached ? 'text-green-600' : 'text-gray-400'}">${meta.cached ? 'CACHED' : 'NEW'}</span>
+                    `;
+                    document.getElementById('textResult').classList.remove('hidden');
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (err) {
+                document.getElementById('llmErrorMessage').textContent = err.message;
+                document.getElementById('llmError').classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                document.getElementById('llmLoading').classList.add('hidden');
+            }
+        });
+
+        // JSON generation
+        document.getElementById('jsonForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            document.getElementById('llmLoading').classList.remove('hidden');
+            document.getElementById('llmError').classList.add('hidden');
+            document.getElementById('jsonResult').classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/v1/llm/json/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system: document.getElementById('jsonSystem').value,
+                        user: document.getElementById('jsonUser').value,
+                        model: document.getElementById('jsonModel').value || null,
+                        temperature: parseFloat(document.getElementById('jsonTemp').value),
+                        use_cache: document.getElementById('jsonCache').checked,
+                    }),
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    document.getElementById('jsonOutput').textContent = JSON.stringify(data.result.data, null, 2);
+                    const meta = data.result.meta;
+                    document.getElementById('jsonMeta').innerHTML = `
+                        <span class="inline-block mr-3">Model: ${meta.model}</span>
+                        <span class="inline-block mr-3">Tokens: ${meta.total_tokens}</span>
+                        <span class="inline-block mr-3">Cost: $${meta.cost_estimate.toFixed(6)}</span>
+                        <span class="inline-block mr-3">Latency: ${meta.latency_ms}ms</span>
+                        <span class="inline-block ${meta.cached ? 'text-green-600' : 'text-gray-400'}">${meta.cached ? 'CACHED' : 'NEW'}</span>
+                    `;
+                    document.getElementById('jsonResult').classList.remove('hidden');
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (err) {
+                document.getElementById('llmErrorMessage').textContent = err.message;
+                document.getElementById('llmError').classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                document.getElementById('llmLoading').classList.add('hidden');
+            }
+        });
+
+        // Analyzer
+        document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = true;
+            document.getElementById('analyzeLoading').classList.remove('hidden');
+            document.getElementById('analyzeError').classList.add('hidden');
+            document.getElementById('analyzeResults').classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/v1/analyzer/analyze/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_url: document.getElementById('repoUrl').value }),
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    factsData = data.facts;
+                    displayAnalyzerResults(data.facts);
+                    document.getElementById('analyzeResults').classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (err) {
+                document.getElementById('analyzeErrorMessage').textContent = err.message;
+                document.getElementById('analyzeError').classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                document.getElementById('analyzeLoading').classList.add('hidden');
+            }
+        });
+
+        function displayAnalyzerResults(facts) {
+            document.getElementById('languagesCount').textContent = facts.languages?.length || 0;
+            document.getElementById('frameworksCount').textContent = facts.frameworks?.length || 0;
+            document.getElementById('architectureType').textContent = facts.architecture?.type || '-';
+
+            const langList = document.getElementById('languagesList');
+            langList.innerHTML = '';
+            (facts.languages || []).forEach(lang => {
+                const badge = document.createElement('span');
+                badge.className = 'bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm';
+                badge.textContent = `${lang.name} (${Math.round(lang.ratio * 100)}%)`;
+                langList.appendChild(badge);
+            });
+
+            const fwList = document.getElementById('frameworksList');
+            fwList.innerHTML = '';
+            (facts.frameworks || []).forEach(fw => {
+                const badge = document.createElement('span');
+                badge.className = 'bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm';
+                badge.textContent = `${fw.name} (${fw.type})`;
+                fwList.appendChild(badge);
+            });
+
+            document.getElementById('factsOutput').textContent = JSON.stringify(facts, null, 2);
+        }
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            if (!factsData) return;
+            const blob = new Blob([JSON.stringify(factsData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'facts.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Stats
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/v1/llm/stats/');
+                const data = await response.json();
+
+                document.getElementById('statsTotal').textContent = data.total;
+                document.getElementById('statsSuccess').textContent = data.success;
+                document.getElementById('statsFailed').textContent = data.failed;
+                document.getElementById('statsInProgress').textContent = data.in_progress;
+
+                const tbody = document.getElementById('recentCalls');
+                if (data.recent.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">No calls yet</td></tr>';
+                } else {
+                    tbody.innerHTML = data.recent.map(call => `
+                        <tr>
+                            <td class="px-4 py-2 font-mono text-xs">${call.fingerprint}</td>
+                            <td class="px-4 py-2">${call.model}</td>
+                            <td class="px-4 py-2">
+                                <span class="px-2 py-1 rounded text-xs ${
+                                    call.status === 'success' ? 'bg-green-100 text-green-800' :
+                                    call.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                }">${call.status}</span>
+                            </td>
+                            <td class="px-4 py-2">$${call.cost.toFixed(6)}</td>
+                            <td class="px-4 py-2 text-xs">${new Date(call.created_at).toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+
+        async function clearCache() {
+            if (!confirm('Clear all LLM cache? This cannot be undone.')) return;
+
+            try {
+                const response = await fetch('/api/v1/llm/clear/', { method: 'POST' });
+                const data = await response.json();
+                alert(`Deleted ${data.deleted} records`);
+                loadStats();
+            } catch (err) {
+                alert('Failed to clear cache: ' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
