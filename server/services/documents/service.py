@@ -182,17 +182,9 @@ class DocumentService:
         section.save(update_fields=['status', 'updated_at'])
 
         try:
-            facts = self.get_facts(document)
-
-            outline_json = ""
-            outline_artifact_id = None
-            if document.outline_current:
-                outline_json = json.dumps(
-                    document.outline_current.data_json,
-                    ensure_ascii=False,
-                    indent=2
-                )
-                outline_artifact_id = str(document.outline_current.id)
+            context_pack_artifact = self._get_context_pack_for_section(
+                document, section, job_id
+            )
 
             if self.mock_mode:
                 content_text = MOCK_SECTION_TEXT.format(
@@ -201,17 +193,15 @@ class DocumentService:
                 )
                 meta = {"mock": True, "job_id": job_id}
             else:
-                facts_slice = json.dumps(facts, ensure_ascii=False, indent=2)[:6000]
+                rendered_prompt = context_pack_artifact.data_json.get("rendered_prompt", {})
+                system_prompt = rendered_prompt.get("system", SECTION_SYSTEM)
+                user_prompt = rendered_prompt.get("user", "")
 
-                user_prompt = SECTION_USER_TEMPLATE.format(
-                    section_key=section.key,
-                    section_title=section.title,
-                    outline_json=outline_json or "Не задан",
-                    facts_slice=facts_slice
-                )
+                if not user_prompt:
+                    raise ValueError(f"No rendered_prompt in context_pack for section {section.key}")
 
                 result = self.llm_client.generate_text(
-                    system=SECTION_SYSTEM,
+                    system=system_prompt,
                     user=user_prompt,
                     temperature=0.7
                 )
@@ -225,7 +215,7 @@ class DocumentService:
                         "total": result.meta.total_tokens
                     },
                     "cost_estimate": result.meta.cost_estimate,
-                    "outline_artifact_id": outline_artifact_id,
+                    "context_pack_artifact_id": str(context_pack_artifact.id),
                     "job_id": job_id
                 }
 
@@ -254,6 +244,17 @@ class DocumentService:
                     'text_current', 'version', 'last_artifact',
                     'status', 'last_error', 'updated_at'
                 ])
+
+            if not self.mock_mode:
+                self._save_llm_trace(
+                    document=document,
+                    section=section,
+                    operation='section_generate',
+                    result_meta=result.meta,
+                    related_artifact_id=str(artifact.id),
+                    context_pack_artifact_id=str(context_pack_artifact.id),
+                    job_id=job_id
+                )
 
             return artifact
 
@@ -336,6 +337,31 @@ class DocumentService:
 
         return artifact
 
+    def _get_context_pack_for_section(
+        self,
+        document: Document,
+        section: Section,
+        job_id: Optional[str] = None
+    ) -> DocumentArtifact:
+        query = DocumentArtifact.objects.filter(
+            document=document,
+            section=section,
+            kind=DocumentArtifact.Kind.CONTEXT_PACK
+        )
+
+        if job_id:
+            query = query.filter(job_id=uuid.UUID(job_id))
+
+        artifact = query.order_by('-created_at').first()
+
+        if not artifact:
+            raise ValueError(
+                f"No context_pack found for section {section.key}. "
+                "Call build_context_pack() first."
+            )
+
+        return artifact
+
     def _get_previous_summaries(self, document: Document, current_section_key: str) -> list[dict]:
         summaries = []
 
@@ -411,4 +437,53 @@ class DocumentService:
             section.summary_current = summary_text
             section.save(update_fields=['summary_current', 'updated_at'])
 
+        if not self.mock_mode:
+            self._save_llm_trace(
+                document=document,
+                section=section,
+                operation='section_summary',
+                result_meta=result.meta,
+                related_artifact_id=str(artifact.id),
+                job_id=job_id
+            )
+
         return artifact
+
+    def _save_llm_trace(
+        self,
+        document: Document,
+        section: Optional[Section],
+        operation: str,
+        result_meta,
+        related_artifact_id: Optional[str] = None,
+        context_pack_artifact_id: Optional[str] = None,
+        job_id: Optional[str] = None
+    ) -> DocumentArtifact:
+        trace_data = {
+            "operation": operation,
+            "model": result_meta.model,
+            "latency_ms": result_meta.latency_ms,
+            "tokens": {
+                "prompt": result_meta.prompt_tokens,
+                "completion": result_meta.completion_tokens,
+                "total": result_meta.total_tokens
+            },
+            "cost_estimate": result_meta.cost_estimate,
+            "section_key": section.key if section else None,
+            "related_artifact_id": related_artifact_id,
+            "context_pack_artifact_id": context_pack_artifact_id,
+            "job_id": job_id
+        }
+
+        return DocumentArtifact.objects.create(
+            document=document,
+            section=section,
+            job_id=uuid.UUID(job_id) if job_id else None,
+            kind=DocumentArtifact.Kind.LLM_TRACE,
+            format=DocumentArtifact.Format.JSON,
+            data_json=trace_data,
+            hash='',
+            source='llm',
+            version='v1',
+            meta={}
+        )
