@@ -41,7 +41,7 @@ register_section_spec(
         key="architecture",
         fact_tags=["architecture", "modules", "layers", "storage", "queue", "infra"],
         fact_keys=[],
-        outline_mode=OutlineMode.PARENTS_ONLY,
+        outline_mode=OutlineMode.STRUCTURE,
         needs_summaries=True,
         style_profile="academic",
         target_chars=(4000, 8000),
