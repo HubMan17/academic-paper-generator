@@ -11,6 +11,7 @@ from apps.projects.models import (
 from services.llm import LLMClient
 from services.llm.errors import LLMError
 from services.utils import compute_content_hash
+from services.prompting import slice_for_section, make_summary_request, parse_summary_response
 
 from .prompts import (
     OUTLINE_SYSTEM, OUTLINE_USER_TEMPLATE,
@@ -266,3 +267,148 @@ class DocumentService:
             section.last_error = str(e)[:1000]
             section.save(update_fields=['status', 'last_error', 'updated_at'])
             raise
+
+    def build_context_pack(
+        self,
+        document: Document,
+        section_key: str,
+        job_id: Optional[str] = None
+    ) -> DocumentArtifact:
+        facts = self.get_facts(document)
+        outline = document.outline_current.data_json if document.outline_current else {}
+
+        summaries = self._get_previous_summaries(document, section_key)
+
+        global_context = f"Проект: {document.params.get('title', 'Анализ ПО')}\nТип документа: {document.get_type_display()}"
+
+        context_pack = slice_for_section(
+            section_key=section_key,
+            facts=facts,
+            outline=outline,
+            summaries=summaries,
+            global_context=global_context
+        )
+
+        context_pack_data = {
+            "section_key": context_pack.section_key,
+            "layers": {
+                "global_context": context_pack.layers.global_context,
+                "outline_excerpt": context_pack.layers.outline_excerpt,
+                "facts_slice": context_pack.layers.facts_slice,
+                "summaries": context_pack.layers.summaries,
+                "constraints": context_pack.layers.constraints
+            },
+            "rendered_prompt": {
+                "system": context_pack.rendered_prompt.system,
+                "user": context_pack.rendered_prompt.user
+            },
+            "budget": {
+                "max_input_tokens_approx": context_pack.budget.max_input_tokens_approx,
+                "max_output_tokens": context_pack.budget.max_output_tokens,
+                "soft_char_limit": context_pack.budget.soft_char_limit
+            },
+            "debug": {
+                "selected_fact_refs": [
+                    {"fact_id": ref.fact_id, "reason": ref.reason, "weight": ref.weight}
+                    for ref in context_pack.debug.selected_fact_refs
+                ],
+                "selection_reason": context_pack.debug.selection_reason,
+                "trims_applied": context_pack.debug.trims_applied
+            }
+        }
+
+        content_hash = compute_content_hash(context_pack_data)
+
+        section = document.sections.get(key=section_key)
+
+        artifact = DocumentArtifact.objects.create(
+            document=document,
+            section=section,
+            job_id=uuid.UUID(job_id) if job_id else None,
+            kind=DocumentArtifact.Kind.CONTEXT_PACK,
+            format=DocumentArtifact.Format.JSON,
+            data_json=context_pack_data,
+            hash=content_hash,
+            source='prompting',
+            version='v1',
+            meta={"job_id": job_id}
+        )
+
+        return artifact
+
+    def _get_previous_summaries(self, document: Document, current_section_key: str) -> list[dict]:
+        summaries = []
+
+        sections = document.sections.filter(
+            status=Section.Status.SUCCESS
+        ).order_by('order')
+
+        for section in sections:
+            if section.key == current_section_key:
+                break
+
+            if section.summary_current:
+                summary_lines = section.summary_current.strip().split('\n')
+                points = [line.lstrip('-•').strip() for line in summary_lines if line.strip()]
+                summaries.append({
+                    "section_key": section.key,
+                    "points": points
+                })
+
+        return summaries[-2:] if len(summaries) > 2 else summaries
+
+    def summarize_section(
+        self,
+        document: Document,
+        section: Section,
+        job_id: Optional[str] = None
+    ) -> DocumentArtifact:
+        if not section.text_current:
+            raise ValueError(f"Section {section.key} has no text to summarize")
+
+        summary_request = make_summary_request(section.text_current, section.key)
+
+        if self.mock_mode:
+            summary_text = "- Первый ключевой пункт\n- Второй ключевой пункт\n- Третий ключевой пункт"
+            meta = {"mock": True, "job_id": job_id}
+        else:
+            result = self.llm_client.generate_text(
+                system=summary_request["system"],
+                user=summary_request["user"],
+                temperature=0.3
+            )
+            summary_text = result.text
+            meta = {
+                "model": result.meta.model,
+                "latency_ms": result.meta.latency_ms,
+                "tokens": {
+                    "prompt": result.meta.prompt_tokens,
+                    "completion": result.meta.completion_tokens,
+                    "total": result.meta.total_tokens
+                },
+                "cost_estimate": result.meta.cost_estimate,
+                "job_id": job_id
+            }
+
+        summary_data = parse_summary_response(summary_text, section.key)
+        content_hash = compute_content_hash(summary_data)
+
+        with transaction.atomic():
+            artifact = DocumentArtifact.objects.create(
+                document=document,
+                section=section,
+                job_id=uuid.UUID(job_id) if job_id else None,
+                kind=DocumentArtifact.Kind.SECTION_SUMMARY,
+                format=DocumentArtifact.Format.JSON,
+                data_json=summary_data,
+                content_text=summary_text,
+                hash=content_hash,
+                source='llm' if not self.mock_mode else 'mock',
+                version='v1',
+                meta=meta
+            )
+
+            section.summary_current = summary_text
+            section.save(update_fields=['summary_current', 'updated_at'])
+
+        return artifact
