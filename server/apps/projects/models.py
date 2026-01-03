@@ -90,6 +90,14 @@ class DocumentArtifact(models.Model):
         CONTEXT_PACK = 'context_pack', 'Context Pack'
         TRACE = 'trace', 'Generation Trace'
         LLM_TRACE = 'llm_trace', 'LLM Call Trace'
+        EDIT_PLAN = 'edit_plan', 'Edit Plan'
+        QUALITY_REPORT = 'quality_report', 'Quality Report'
+        GLOSSARY = 'glossary', 'Glossary'
+        CONSISTENCY_REPORT = 'consistency_report', 'Consistency Report'
+        CHAPTER_CONCLUSIONS = 'chapter_conclusions', 'Chapter Conclusions'
+        TRANSITIONS = 'transitions', 'Transitions'
+        SECTION_EDITED = 'section_edited', 'Section Edited'
+        DOCUMENT_EDITED = 'document_edited', 'Document Edited'
 
     class Format(models.TextChoices):
         JSON = 'json', 'JSON'
@@ -132,6 +140,8 @@ class Document(models.Model):
         DRAFT = 'draft', 'Draft'
         GENERATING = 'generating', 'Generating'
         READY = 'ready', 'Ready'
+        EDITING = 'editing', 'Editing'
+        FINALIZED = 'finalized', 'Finalized'
         ERROR = 'error', 'Error'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
