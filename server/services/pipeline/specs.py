@@ -181,7 +181,44 @@ SECTION_REGISTRY: dict[str, PipelineSectionSpec] = {
 
 
 def get_section_spec(key: str) -> PipelineSectionSpec | None:
-    return SECTION_REGISTRY.get(key)
+    if key in SECTION_REGISTRY:
+        return SECTION_REGISTRY[key]
+
+    chapter_key = 'practice'
+    depth = 1
+    fact_tags = ['modules', 'models', 'tech_stack']
+
+    if key in ('intro', 'introduction'):
+        chapter_key = 'intro'
+        depth = 0
+        fact_tags = ["project_name", "description", "tech_stack", "purpose"]
+    elif key in ('conclusion', 'conclusions', 'summary'):
+        chapter_key = 'conclusion'
+        depth = 0
+        fact_tags = ["project_name", "purpose"]
+    elif key.startswith('theory_') or key in ('concepts', 'technologies', 'comparison', 'methods', 'theory'):
+        chapter_key = 'theory'
+        depth = 1
+        fact_tags = THEORY_SECTION_TAGS.get(key, THEORY_SECTION_TAGS.get(key.replace('theory_', ''), ['tech_stack', 'frameworks']))
+    elif key.startswith('practice_') or key in PRACTICE_SECTION_TAGS:
+        chapter_key = 'practice'
+        depth = 1
+        fact_tags = PRACTICE_SECTION_TAGS.get(key, PRACTICE_SECTION_TAGS.get(key.replace('practice_', ''), ['modules', 'models']))
+
+    return PipelineSectionSpec(
+        key=key,
+        title=key.replace('_', ' ').title(),
+        order=0,
+        chapter_key=chapter_key,
+        depth=depth,
+        required=True,
+        depends_on=[],
+        target_words=(600, 1200),
+        fact_tags=fact_tags,
+        outline_mode=OutlineMode.STRUCTURE,
+        needs_summaries=True,
+        constraints=[],
+    )
 
 
 def get_all_section_keys() -> list[str]:

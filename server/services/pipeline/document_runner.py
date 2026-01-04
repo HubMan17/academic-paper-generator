@@ -5,10 +5,10 @@ from typing import Callable
 from uuid import UUID
 
 from apps.projects.models import Document
-from services.pipeline.ensure import get_success_artifact
+from services.pipeline.ensure import get_success_artifact, get_outline_artifact
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.profiles import get_profile
-from services.pipeline.specs import get_all_section_keys, get_section_spec
+from services.pipeline.specs import get_section_spec
 from services.pipeline.steps import (
     ensure_outline,
     ensure_outline_v2,
@@ -84,7 +84,8 @@ class DocumentRunner:
             self._run_outline(job_id, force)
             self._report_progress(10, "Outline completed")
 
-            section_keys = get_all_section_keys()
+            document = Document.objects.get(id=self.document_id)
+            section_keys = list(document.sections.order_by('order').values_list('key', flat=True))
             section_count = len(section_keys)
 
             for i, key in enumerate(section_keys):
@@ -154,7 +155,7 @@ class DocumentRunner:
         try:
             self._report_progress(0, f"Starting section {section_key}")
 
-            outline = get_success_artifact(self.document_id, ArtifactKind.OUTLINE.value)
+            outline = get_outline_artifact(self.document_id)
             if not outline:
                 self._run_outline(job_id, force=False)
 
@@ -207,15 +208,16 @@ class DocumentRunner:
         try:
             self._report_progress(0, "Resuming document generation")
 
-            outline = get_success_artifact(self.document_id, ArtifactKind.OUTLINE.value)
+            outline = get_outline_artifact(self.document_id)
             if not outline:
                 self._run_outline(job_id, force=False)
                 self._report_progress(10, "Outline created")
             else:
-                self._track_artifact(ArtifactKind.OUTLINE.value, was_cached=True)
+                self._track_artifact(ArtifactKind.OUTLINE_V2.value, was_cached=True)
                 self._report_progress(10, "Outline exists, skipping")
 
-            section_keys = get_all_section_keys()
+            document = Document.objects.get(id=self.document_id)
+            section_keys = list(document.sections.order_by('order').values_list('key', flat=True))
             section_count = len(section_keys)
             resume_from = None
 
@@ -276,10 +278,10 @@ class DocumentRunner:
             )
 
     def _run_outline(self, job_id: UUID | None, force: bool):
-        kind = ArtifactKind.OUTLINE.value
+        kind = ArtifactKind.OUTLINE_V2.value
         existing = get_success_artifact(self.document_id, kind)
 
-        artifact = ensure_outline(
+        artifact = ensure_outline_v2(
             document_id=self.document_id,
             force=force,
             job_id=job_id,

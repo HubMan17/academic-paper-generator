@@ -42,6 +42,14 @@ def get_success_artifact(document_id: UUID, kind: str) -> DocumentArtifact | Non
         return None
 
 
+def get_outline_artifact(document_id: UUID) -> DocumentArtifact | None:
+    from services.pipeline.kinds import ArtifactKind
+    artifact = get_success_artifact(document_id, ArtifactKind.OUTLINE_V2.value)
+    if not artifact:
+        artifact = get_success_artifact(document_id, ArtifactKind.OUTLINE.value)
+    return artifact
+
+
 def get_artifact_by_kind(document_id: UUID, kind: str) -> DocumentArtifact | None:
     return DocumentArtifact.objects.filter(
         document_id=document_id,

@@ -15,7 +15,7 @@ from services.pipeline.profiles import (
     PROFILE_FAST, PROFILE_DEFAULT, PROFILE_HEAVY,
 )
 from services.pipeline.ensure import (
-    ensure_artifact, get_success_artifact, get_artifact_by_kind,
+    ensure_artifact, get_success_artifact, get_outline_artifact, get_artifact_by_kind,
     list_section_kinds, get_latest_summaries,
     ArtifactStatus, invalidate_assembly_artifacts,
 )
@@ -50,6 +50,7 @@ __all__ = [
     "PROFILE_HEAVY",
     "ensure_artifact",
     "get_success_artifact",
+    "get_outline_artifact",
     "get_artifact_by_kind",
     "list_section_kinds",
     "get_latest_summaries",

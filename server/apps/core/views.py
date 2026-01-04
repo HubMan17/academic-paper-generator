@@ -284,6 +284,7 @@ def pipeline_run_api(request):
     topic_description = request.data.get('topic_description', '')
     facts = request.data.get('facts')
     mock_mode = request.data.get('mock_mode', True)
+    stop_after = request.data.get('stop_after', None)  # 'outline', 'sections', etc.
 
     try:
         if mock_mode:
@@ -381,30 +382,43 @@ def pipeline_run_api(request):
                 "mock": True
             }
         else:
+            from django.db.models import Sum
             from apps.projects.models import (
                 Project, AnalysisRun, Artifact, Document, DocumentProfile, Section
             )
+            from apps.llm.models import LLMCall
             from services.pipeline import DocumentRunner
             from services.pipeline.kinds import ArtifactKind
-            from services.pipeline.ensure import get_success_artifact
+            from services.pipeline.ensure import get_success_artifact, get_outline_artifact
 
+            test_repo_url = "https://github.com/test/pipeline-test"
             project, _ = Project.objects.get_or_create(
-                name="Test Pipeline Project",
-                defaults={"repo_url": "https://github.com/test/test"}
+                repo_url=test_repo_url,
             )
 
             analysis_run = AnalysisRun.objects.create(
                 project=project,
-                repo_url=project.repo_url,
                 status=AnalysisRun.Status.SUCCESS
             )
 
-            if facts:
-                Artifact.objects.create(
-                    analysis_run=analysis_run,
-                    kind=Artifact.Kind.FACTS,
-                    data=facts
-                )
+            if not facts:
+                facts = {
+                    "project_name": topic_title,
+                    "languages": [{"name": "Python", "percentage": 100}],
+                    "frameworks": [{"name": "Django", "version": "5.0"}],
+                    "architecture": {"pattern": "MVC", "evidence": []},
+                    "databases": [{"type": "SQLite"}],
+                    "facts": [
+                        {"id": "default_1", "text": f"Проект: {topic_title}", "tags": ["project", "overview"]},
+                        {"id": "default_2", "text": "Веб-приложение на Python/Django", "tags": ["technology", "web"]},
+                    ]
+                }
+
+            Artifact.objects.create(
+                analysis_run=analysis_run,
+                kind=Artifact.Kind.FACTS,
+                data=facts
+            )
 
             doc_profile = DocumentProfile.objects.create(
                 work_type=work_type,
@@ -420,6 +434,50 @@ def pipeline_run_api(request):
                 params={"title": topic_title, "description": topic_description},
             )
 
+            llm_count_before = LLMCall.objects.count()
+
+            from services.pipeline.steps import ensure_outline_v2
+
+            if stop_after == 'outline':
+                outline_artifact = ensure_outline_v2(
+                    document_id=document.id,
+                    force=False,
+                    profile=profile,
+                    mock_mode=False,
+                )
+
+                document.refresh_from_db()
+                sections_created = list(document.sections.order_by('order').values('key', 'title', 'chapter_key', 'depth', 'order'))
+
+                outline_data = outline_artifact.data_json if outline_artifact else {}
+
+                result = {
+                    "outline": outline_data,
+                    "sections_created": sections_created,
+                    "sections_count": len(sections_created),
+                    "work_type": work_type,
+                    "profile": profile,
+                    "mock": False,
+                    "document_id": str(document.id),
+                    "stop_after": stop_after,
+                }
+
+                new_llm_calls = LLMCall.objects.filter(created_at__gte=document.created_at)
+                total_tokens = sum(c.meta.get('total_tokens', 0) for c in new_llm_calls if c.meta)
+                total_cost = sum(c.meta.get('cost_estimate', 0) for c in new_llm_calls if c.meta)
+
+                result["usage"] = {
+                    "llm_calls": new_llm_calls.count(),
+                    "total_tokens": total_tokens,
+                    "total_cost": round(total_cost, 4),
+                }
+
+                return Response({
+                    "status": "success",
+                    "result": result,
+                    "error": None
+                })
+
             runner = DocumentRunner(
                 document_id=document.id,
                 profile=profile,
@@ -427,7 +485,18 @@ def pipeline_run_api(request):
             )
             run_result = runner.run_full()
 
-            outline_artifact = get_success_artifact(document.id, ArtifactKind.OUTLINE.value)
+            new_llm_calls = LLMCall.objects.filter(
+                created_at__gte=document.created_at
+            )
+            total_tokens = 0
+            total_cost = 0.0
+            llm_calls_count = new_llm_calls.count()
+            for call in new_llm_calls:
+                if call.meta:
+                    total_tokens += call.meta.get('total_tokens', 0)
+                    total_cost += call.meta.get('cost_estimate', 0)
+
+            outline_artifact = get_outline_artifact(document.id)
             outline_data = outline_artifact.data_json if outline_artifact else {}
 
             sections_data = []
@@ -467,6 +536,11 @@ def pipeline_run_api(request):
                     "artifacts_cached": run_result.artifacts_cached,
                     "errors": run_result.errors,
                     "duration_ms": run_result.duration_ms,
+                },
+                "usage": {
+                    "llm_calls": llm_calls_count,
+                    "total_tokens": total_tokens,
+                    "total_cost": round(total_cost, 4),
                 }
             }
 

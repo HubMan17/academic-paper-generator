@@ -3,7 +3,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from apps.projects.models import Artifact, Document, DocumentArtifact
+from apps.projects.models import Artifact, Document, DocumentArtifact, Section
 from services.llm import LLMClient
 from services.pipeline.ensure import ensure_artifact
 from services.pipeline.kinds import ArtifactKind
@@ -152,6 +152,86 @@ MOCK_OUTLINE_V2 = {
 }
 
 
+PRACTICE_SECTION_KEYS = {'analysis', 'architecture', 'implementation', 'testing', 'design', 'development'}
+
+def get_chapter_key_for_section(section_key: str) -> str:
+    if section_key in ('intro', 'introduction'):
+        return 'intro'
+    elif section_key in ('theory', 'theoretical', 'concepts', 'technologies', 'literature_review'):
+        return 'theory'
+    elif section_key in PRACTICE_SECTION_KEYS:
+        return 'practice'
+    elif section_key in ('conclusion', 'conclusions', 'summary'):
+        return 'conclusion'
+    elif section_key in ('literature', 'references', 'bibliography'):
+        return 'literature'
+    elif section_key in ('toc', 'contents'):
+        return 'toc'
+    return section_key
+
+
+def create_sections_from_outline(document: Document, outline_data: dict) -> list[Section]:
+    existing_keys = set(document.sections.values_list('key', flat=True))
+    created_sections = []
+    order = 0
+
+    if outline_data.get('version') == 'v2' or 'chapters' in outline_data:
+        for chapter in outline_data.get('chapters', []):
+            chapter_key = chapter.get('key', '')
+            if chapter.get('is_auto'):
+                continue
+
+            if 'sections' in chapter:
+                for sec in chapter['sections']:
+                    key = sec.get('key', '')
+                    if key and key not in existing_keys:
+                        section = Section.objects.create(
+                            document=document,
+                            key=key,
+                            chapter_key=chapter_key,
+                            title=sec.get('title', key),
+                            order=order,
+                            depth=2,
+                        )
+                        created_sections.append(section)
+                        existing_keys.add(key)
+                        order += 1
+            else:
+                key = chapter_key
+                if key and key not in existing_keys:
+                    section = Section.objects.create(
+                        document=document,
+                        key=key,
+                        chapter_key=chapter_key,
+                        title=chapter.get('title', key),
+                        order=order,
+                        depth=1,
+                    )
+                    created_sections.append(section)
+                    existing_keys.add(key)
+                    order += 1
+    else:
+        for sec in outline_data.get('sections', []):
+            key = sec.get('key', '')
+            if key and key not in existing_keys:
+                chapter_key = get_chapter_key_for_section(key)
+                depth = 2 if chapter_key == 'practice' else 1
+                section = Section.objects.create(
+                    document=document,
+                    key=key,
+                    chapter_key=chapter_key,
+                    title=sec.get('title', key),
+                    order=order,
+                    depth=depth,
+                )
+                created_sections.append(section)
+                existing_keys.add(key)
+                order += 1
+
+    logger.info(f"Created {len(created_sections)} sections for document {document.id}")
+    return created_sections
+
+
 def get_facts(document: Document) -> dict:
     artifact = Artifact.objects.filter(
         analysis_run=document.analysis_run,
@@ -237,6 +317,9 @@ def ensure_outline(
         document.outline_current = artifact
         document.save(update_fields=['outline_current', 'updated_at'])
 
+    outline_data = artifact.data_json or {}
+    create_sections_from_outline(document, outline_data)
+
     return artifact
 
 
@@ -298,6 +381,9 @@ def ensure_outline_v2(
                 practice_count=preset.practice_depth,
             )
 
+            logger.info(f"Generating outline v2 for document {document_id}")
+            logger.debug(f"User prompt length: {len(user_prompt)} chars")
+
             result = llm_client.generate_json(
                 system=OUTLINE_V2_SYSTEM,
                 user=user_prompt,
@@ -305,6 +391,7 @@ def ensure_outline_v2(
                 max_tokens=prof.default_budget.max_output_tokens,
             )
             outline_data = result.data
+            logger.info(f"Outline v2 generated successfully, {len(outline_data.get('chapters', []))} chapters")
             outline_data['version'] = 'v2'
             outline_data['work_type'] = work_type
 
@@ -342,6 +429,9 @@ def ensure_outline_v2(
     if document.outline_current != artifact:
         document.outline_current = artifact
         document.save(update_fields=['outline_current', 'updated_at'])
+
+    outline_data = artifact.data_json or {}
+    create_sections_from_outline(document, outline_data)
 
     return artifact
 

@@ -9,9 +9,43 @@ def register_section_spec(spec: SectionSpec) -> None:
 
 
 def get_section_spec(key: str) -> SectionSpec:
-    if key not in _REGISTRY:
-        raise ValueError(f"Section spec not found: {key}")
-    return _REGISTRY[key]
+    if key in _REGISTRY:
+        return _REGISTRY[key]
+
+    chapter_key = 'practice'
+    fact_tags = ['modules', 'models', 'tech_stack']
+    target_chars = (3000, 6000)
+    outline_mode = OutlineMode.STRUCTURE
+
+    if key in ('intro', 'introduction'):
+        chapter_key = 'intro'
+        fact_tags = ["project_name", "description", "tech_stack", "purpose"]
+        target_chars = (2500, 5000)
+        outline_mode = OutlineMode.FULL
+    elif key in ('conclusion', 'conclusions', 'summary'):
+        chapter_key = 'conclusion'
+        fact_tags = ["project_name", "purpose"]
+        target_chars = (1500, 3000)
+        outline_mode = OutlineMode.FULL
+    elif key.startswith('theory_') or key in ('concepts', 'technologies', 'comparison', 'methods'):
+        chapter_key = 'theory'
+        fact_tags = ['tech_stack', 'frameworks', 'architecture']
+        target_chars = (3500, 7000)
+    elif key.startswith('practice_') or key in ('analysis', 'architecture', 'implementation', 'testing', 'design', 'development'):
+        chapter_key = 'practice'
+        fact_tags = ['modules', 'models', 'api', 'endpoints']
+        target_chars = (3000, 6000)
+
+    return SectionSpec(
+        key=key,
+        fact_tags=fact_tags,
+        fact_keys=[],
+        outline_mode=outline_mode,
+        needs_summaries=True,
+        style_profile="academic",
+        target_chars=target_chars,
+        constraints=["Академический тон", "Без воды и повторов"],
+    )
 
 
 def list_section_keys() -> list[str]:

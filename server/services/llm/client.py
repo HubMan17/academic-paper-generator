@@ -1,4 +1,7 @@
+import asyncio
 import json
+import logging
+import random
 import time
 from dataclasses import asdict
 from datetime import timedelta
@@ -23,6 +26,8 @@ from .errors import (
     LLMConfigError,
 )
 from .pricing import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_S, DEFAULT_LOCK_POLL_INTERVAL
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient:
@@ -330,9 +335,13 @@ class LLMClient:
 
                 text = self._clean_json_response(response.text)
 
+                if not text:
+                    raise LLMInvalidJSONError("Empty response from LLM")
+
                 try:
                     data = json.loads(text)
                 except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON response: {text[:500]}")
                     raise LLMInvalidJSONError(f"Invalid JSON: {e}") from e
 
                 if schema:
@@ -340,8 +349,9 @@ class LLMClient:
 
                 return self._build_json_result(response, data, model, attempt, fingerprint, system, user)
 
-            except (LLMRateLimitError, LLMTimeoutError) as e:
+            except (LLMRateLimitError, LLMTimeoutError, LLMInvalidJSONError) as e:
                 last_error = e
+                logger.warning(f"Retryable error on attempt {attempt}: {e}")
                 if attempt < max_retries:
                     sleep_with_backoff(attempt)
                 continue
@@ -349,6 +359,7 @@ class LLMClient:
                 if not e.is_retryable:
                     raise
                 last_error = e
+                logger.warning(f"Provider error on attempt {attempt}: {e}")
                 if attempt < max_retries:
                     sleep_with_backoff(attempt)
                 continue
@@ -435,3 +446,138 @@ class LLMClient:
             jsonschema.validate(data, schema)
         except jsonschema.ValidationError as e:
             raise LLMSchemaValidationError(f"Schema validation failed: {e.message}") from e
+
+    async def agenerate_text(
+        self,
+        system: str,
+        user: str,
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ) -> LLMTextResult:
+        check_input_limits(system, user)
+        model_name = model or self._provider.default_model
+        fingerprint = make_fingerprint(model_name, system, user, {"temperature": temperature, "max_tokens": max_tokens})
+
+        return await self._acall_with_retries_text(
+            system, user, model_name, temperature, max_tokens, fingerprint
+        )
+
+    async def agenerate_json(
+        self,
+        system: str,
+        user: str,
+        *,
+        model: str | None = None,
+        temperature: float = 0.3,
+        max_tokens: int | None = None,
+        schema: dict[str, Any] | None = None,
+    ) -> LLMJsonResult:
+        check_input_limits(system, user)
+        model_name = model or self._provider.default_model
+        fingerprint = make_fingerprint(model_name, system, user, {"temperature": temperature, "max_tokens": max_tokens, "json_mode": True}, schema)
+
+        return await self._acall_with_retries_json(
+            system, user, model_name, temperature, max_tokens, fingerprint, schema
+        )
+
+    async def _acall_with_retries_text(
+        self,
+        system: str,
+        user: str,
+        model: str,
+        temperature: float,
+        max_tokens: int | None,
+        fingerprint: str,
+    ) -> LLMTextResult:
+        max_retries = getattr(settings, 'LLM_MAX_RETRIES', DEFAULT_MAX_RETRIES)
+        last_error = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = await self._provider.achat_completion(
+                    system=system,
+                    user=user,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return self._build_text_result(response, model, attempt, fingerprint, system, user)
+            except (LLMRateLimitError, LLMTimeoutError) as e:
+                last_error = e
+                if attempt < max_retries:
+                    await self._async_sleep_with_backoff(attempt)
+                continue
+            except LLMProviderError as e:
+                if not e.is_retryable:
+                    raise
+                last_error = e
+                if attempt < max_retries:
+                    await self._async_sleep_with_backoff(attempt)
+                continue
+
+        raise last_error
+
+    async def _acall_with_retries_json(
+        self,
+        system: str,
+        user: str,
+        model: str,
+        temperature: float,
+        max_tokens: int | None,
+        fingerprint: str,
+        schema: dict[str, Any] | None,
+    ) -> LLMJsonResult:
+        max_retries = getattr(settings, 'LLM_MAX_RETRIES', DEFAULT_MAX_RETRIES)
+        last_error = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = await self._provider.achat_completion(
+                    system=system,
+                    user=user,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format={"type": "json_object"},
+                )
+
+                text = self._clean_json_response(response.text)
+
+                if not text:
+                    raise LLMInvalidJSONError("Empty response from LLM")
+
+                try:
+                    data = json.loads(text)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON response: {text[:500]}")
+                    raise LLMInvalidJSONError(f"Invalid JSON: {e}") from e
+
+                if schema:
+                    self._validate_schema(data, schema)
+
+                return self._build_json_result(response, data, model, attempt, fingerprint, system, user)
+
+            except (LLMRateLimitError, LLMTimeoutError, LLMInvalidJSONError) as e:
+                last_error = e
+                logger.warning(f"Retryable error on attempt {attempt}: {e}")
+                if attempt < max_retries:
+                    await self._async_sleep_with_backoff(attempt)
+                continue
+            except LLMProviderError as e:
+                if not e.is_retryable:
+                    raise
+                last_error = e
+                logger.warning(f"Provider error on attempt {attempt}: {e}")
+                if attempt < max_retries:
+                    await self._async_sleep_with_backoff(attempt)
+                continue
+
+        raise last_error
+
+    async def _async_sleep_with_backoff(self, attempt: int) -> None:
+        base_delay = 1.0
+        delay = base_delay * (2 ** (attempt - 1))
+        jitter = delay * 0.1 * (2 * random.random() - 1)
+        await asyncio.sleep(delay + jitter)

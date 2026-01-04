@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from apps.projects.models import Document, DocumentArtifact, Section
-from services.pipeline.ensure import ensure_artifact, get_success_artifact
+from services.pipeline.ensure import ensure_artifact, get_success_artifact, get_outline_artifact
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.profiles import get_profile
 from services.pipeline.specs import get_section_spec
@@ -51,7 +51,7 @@ def ensure_context_pack(
     def builder() -> dict[str, Any]:
         document = Document.objects.get(id=document_id)
 
-        outline_artifact = get_success_artifact(document_id, ArtifactKind.OUTLINE.value)
+        outline_artifact = get_outline_artifact(document_id)
         if not outline_artifact or not outline_artifact.data_json:
             raise ValueError(f"No outline found for document {document_id}")
 

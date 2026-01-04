@@ -5,7 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from apps.projects.models import Document, DocumentArtifact
-from services.pipeline.ensure import ensure_artifact, get_success_artifact
+from services.pipeline.ensure import ensure_artifact, get_success_artifact, get_outline_artifact
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.schemas import Toc, TocItem, toc_to_dict
 
@@ -43,7 +43,7 @@ def ensure_toc(
 
         draft_artifact = get_success_artifact(document_id, ArtifactKind.DOCUMENT_DRAFT.value)
         if not draft_artifact or not draft_artifact.data_json:
-            outline_artifact = get_success_artifact(document_id, ArtifactKind.OUTLINE.value)
+            outline_artifact = get_outline_artifact(document_id)
             if not outline_artifact or not outline_artifact.data_json:
                 raise ValueError(f"No outline or draft found for document {document_id}")
 

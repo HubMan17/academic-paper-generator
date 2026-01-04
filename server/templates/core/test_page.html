@@ -384,6 +384,15 @@
                             <label for="pipelineMockMode" class="text-sm text-gray-700">Mock Mode (без LLM)</label>
                         </div>
 
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Остановиться после</label>
+                            <select id="pipelineStopAfter" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="">Полный пайплайн</option>
+                                <option value="outline" selected>Только Outline</option>
+                                <option value="sections">Outline + Sections</option>
+                            </select>
+                        </div>
+
                         <button onclick="runPipeline()" id="pipelineRunBtn" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400">
                             Запустить Pipeline
                         </button>
@@ -430,15 +439,35 @@
                     </div>
 
                     <div id="pipelineStats" class="mt-4 hidden">
-                        <div class="grid grid-cols-2 gap-4 text-center">
-                            <div class="bg-blue-50 rounded-lg p-3">
-                                <p class="text-xl font-bold text-blue-600" id="pipelineTotalSections">0</p>
+                        <div class="grid grid-cols-2 gap-2 text-center mb-2">
+                            <div class="bg-blue-50 rounded-lg p-2">
+                                <p class="text-lg font-bold text-blue-600" id="pipelineTotalSections">0</p>
                                 <p class="text-xs text-gray-600">Sections</p>
                             </div>
-                            <div class="bg-green-50 rounded-lg p-3">
-                                <p class="text-xl font-bold text-green-600" id="pipelineTotalWords">0</p>
+                            <div class="bg-green-50 rounded-lg p-2">
+                                <p class="text-lg font-bold text-green-600" id="pipelineTotalWords">0</p>
                                 <p class="text-xs text-gray-600">Words</p>
                             </div>
+                        </div>
+                        <div id="pipelineUsage" class="hidden">
+                            <div class="bg-yellow-50 rounded-lg p-3 text-center">
+                                <p class="text-xs text-gray-600 mb-1">LLM Usage</p>
+                                <div class="flex justify-around">
+                                    <div>
+                                        <p class="text-sm font-bold text-yellow-700" id="pipelineLlmCalls">0</p>
+                                        <p class="text-xs text-gray-500">calls</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-bold text-yellow-700" id="pipelineTotalTokens">0</p>
+                                        <p class="text-xs text-gray-500">tokens</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-bold text-yellow-700" id="pipelineTotalCost">$0</p>
+                                        <p class="text-xs text-gray-500">cost</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500 text-center" id="pipelineDuration"></div>
                         </div>
                     </div>
                 </div>
@@ -957,6 +986,7 @@
                         topic_description: topicDesc,
                         facts: facts,
                         mock_mode: mockMode,
+                        stop_after: document.getElementById('pipelineStopAfter').value || null,
                     }),
                 });
 
@@ -965,15 +995,21 @@
                 if (data.status === 'success') {
                     pipelineData = data.result;
 
-                    // Update step statuses
-                    updateStepStatus('outline', 'done');
-                    updateStepStatus('context', 'done');
-                    updateStepStatus('sections', 'done', `${data.result.sections_count} секций`);
-                    updateStepStatus('enrichment', 'done');
-                    updateStepStatus('editing', 'done');
-                    updateStepStatus('literature', 'done', `${data.result.sources_count || 0} источников`);
-                    updateStepStatus('assemble', 'done');
-                    updateStepStatus('quality', 'done');
+                    // Update step statuses based on stop_after
+                    const stopAfter = data.result.stop_after;
+                    updateStepStatus('outline', 'done', `${data.result.sections_count} секций создано`);
+
+                    if (!stopAfter || stopAfter !== 'outline') {
+                        updateStepStatus('context', 'done');
+                        updateStepStatus('sections', 'done', `${data.result.sections_count} секций`);
+                    }
+                    if (!stopAfter) {
+                        updateStepStatus('enrichment', 'done');
+                        updateStepStatus('editing', 'done');
+                        updateStepStatus('literature', 'done', `${data.result.sources_count || 0} источников`);
+                        updateStepStatus('assemble', 'done');
+                        updateStepStatus('quality', 'done');
+                    }
 
                     // Display results
                     displayPipelineResults(data.result);
@@ -1004,10 +1040,23 @@
                 document.getElementById('pipelineOutline').textContent = JSON.stringify(result.outline, null, 2);
             }
 
-            // Sections
+            // Sections (with content) or sections_created (just structure)
             const sectionsDiv = document.getElementById('pipelineSections');
             sectionsDiv.innerHTML = '';
-            if (result.sections) {
+
+            if (result.sections_created) {
+                // Show section structure from outline step
+                result.sections_created.forEach((section, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'bg-blue-50 rounded p-2 text-sm';
+                    div.innerHTML = `
+                        <span class="font-mono text-blue-700">${section.key}</span>
+                        <span class="text-gray-600 ml-2">${section.title}</span>
+                        <span class="text-xs text-gray-400 ml-2">(chapter: ${section.chapter_key}, depth: ${section.depth})</span>
+                    `;
+                    sectionsDiv.appendChild(div);
+                });
+            } else if (result.sections) {
                 result.sections.forEach((section, i) => {
                     const div = document.createElement('details');
                     div.className = 'bg-gray-50 rounded p-2';
@@ -1033,6 +1082,24 @@
             document.getElementById('pipelineTotalSections').textContent = result.sections_count || 0;
             document.getElementById('pipelineTotalWords').textContent = result.total_words || 0;
             document.getElementById('pipelineStats').classList.remove('hidden');
+
+            // Usage (for real mode)
+            if (result.usage) {
+                document.getElementById('pipelineLlmCalls').textContent = result.usage.llm_calls || 0;
+                document.getElementById('pipelineTotalTokens').textContent = (result.usage.total_tokens || 0).toLocaleString();
+                document.getElementById('pipelineTotalCost').textContent = '$' + (result.usage.total_cost || 0).toFixed(4);
+                document.getElementById('pipelineUsage').classList.remove('hidden');
+            } else {
+                document.getElementById('pipelineUsage').classList.add('hidden');
+            }
+
+            // Duration from run_result
+            if (result.run_result && result.run_result.duration_ms) {
+                const durationSec = (result.run_result.duration_ms / 1000).toFixed(1);
+                document.getElementById('pipelineDuration').textContent = `Duration: ${durationSec}s`;
+            } else {
+                document.getElementById('pipelineDuration').textContent = '';
+            }
 
             document.getElementById('pipelineResult').classList.remove('hidden');
         }

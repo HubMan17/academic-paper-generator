@@ -14,6 +14,7 @@ from services.pipeline import (
     get_profile,
     list_profiles,
     get_success_artifact,
+    get_outline_artifact,
     ArtifactKind,
     get_all_section_keys,
     get_section_spec,
@@ -110,7 +111,7 @@ def run_pipeline(request, document_id):
 def pipeline_status(request, document_id):
     doc = get_object_or_404(Document, id=document_id)
 
-    outline = get_success_artifact(document_id, ArtifactKind.OUTLINE.value)
+    outline = get_outline_artifact(document_id)
     draft = get_success_artifact(document_id, ArtifactKind.DOCUMENT_DRAFT.value)
     toc = get_success_artifact(document_id, ArtifactKind.TOC.value)
     quality = get_success_artifact(document_id, ArtifactKind.QUALITY_REPORT.value)

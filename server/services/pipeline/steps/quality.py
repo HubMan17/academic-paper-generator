@@ -6,13 +6,13 @@ from typing import Any
 from uuid import UUID
 
 from apps.projects.models import Document, DocumentArtifact
-from services.pipeline.ensure import ensure_artifact, get_success_artifact
+from services.pipeline.ensure import ensure_artifact, get_success_artifact, get_outline_artifact
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.schemas import (
     QualityReport, QualityStats, SectionCoverage,
     quality_report_to_dict,
 )
-from services.pipeline.specs import get_section_spec, get_all_section_keys
+from services.pipeline.specs import get_section_spec
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def ensure_quality_report(
         document = Document.objects.get(id=document_id)
         report = QualityReport(generated_at=datetime.utcnow())
 
-        outline_artifact = get_success_artifact(document_id, ArtifactKind.OUTLINE.value)
+        outline_artifact = get_outline_artifact(document_id)
         outline = outline_artifact.data_json if outline_artifact else None
 
         if not outline:
@@ -62,41 +62,34 @@ def ensure_quality_report(
         draft_artifact = get_success_artifact(document_id, ArtifactKind.DOCUMENT_DRAFT.value)
         draft = draft_artifact.data_json if draft_artifact else None
 
-        section_keys = get_all_section_keys()
+        db_sections = list(document.sections.order_by('order'))
         total_words = 0
         total_chars = 0
         section_words = {}
         section_count = 0
         seen_titles = set()
 
-        required_total = 0
+        required_total = len(db_sections)
         required_present = 0
         target_words_min = 0
         target_words_max = 0
         sections_coverage = []
 
-        for key in section_keys:
+        for db_section in db_sections:
+            key = db_section.key
             spec = get_section_spec(key)
             section_artifact = get_success_artifact(document_id, ArtifactKind.section(key))
 
-            if outline:
-                outline_has_section = any(s.get("key") == key for s in outline.get("sections", []))
-            else:
-                outline_has_section = False
-
-            is_required = spec.required if spec else False
-            if is_required:
-                required_total += 1
-
-            min_words = spec.target_words[0] if spec else 0
-            max_words = spec.target_words[1] if spec else 0
+            is_required = True
+            min_words = spec.target_words[0] if spec else 600
+            max_words = spec.target_words[1] if spec else 1200
             target_words_min += min_words
             target_words_max += max_words
 
             if not section_artifact:
                 sections_coverage.append(SectionCoverage(
                     key=key,
-                    title=spec.title if spec else key,
+                    title=db_section.title or key,
                     required=is_required,
                     present=False,
                     word_count=0,
@@ -105,18 +98,11 @@ def ensure_quality_report(
                     status="missing",
                 ))
 
-                if is_required:
-                    report.add_error(
-                        "MISSING_SECTION",
-                        f"Required section '{key}' not generated",
-                        section_key=key
-                    )
-                elif outline_has_section:
-                    report.add_warning(
-                        "OUTLINE_SECTION_MISSING",
-                        f"Section '{key}' in outline but not generated",
-                        section_key=key
-                    )
+                report.add_error(
+                    "MISSING_SECTION",
+                    f"Required section '{key}' not generated",
+                    section_key=key
+                )
                 continue
 
             content = section_artifact.content_text or ""
@@ -161,7 +147,7 @@ def ensure_quality_report(
 
             sections_coverage.append(SectionCoverage(
                 key=key,
-                title=spec.title if spec else key,
+                title=db_section.title or key,
                 required=is_required,
                 present=True,
                 word_count=words,
@@ -170,21 +156,14 @@ def ensure_quality_report(
                 status=section_status,
             ))
 
-            title = None
-            if draft:
-                for s in draft.get("sections", []):
-                    if s.get("key") == key:
-                        title = s.get("title")
-                        break
-
-            if title:
-                if title in seen_titles:
-                    report.add_warning(
-                        "DUPLICATE_TITLE",
-                        f"Title '{title}' appears multiple times",
-                        section_key=key
-                    )
-                seen_titles.add(title)
+            section_title = db_section.title or key
+            if section_title in seen_titles:
+                report.add_warning(
+                    "DUPLICATE_TITLE",
+                    f"Title '{section_title}' appears multiple times",
+                    section_key=key
+                )
+            seen_titles.add(section_title)
 
             is_repetitive, ratio = check_ngram_repetition(content)
             if is_repetitive:
@@ -193,13 +172,6 @@ def ensure_quality_report(
                     f"Section '{key}' has high 3-gram repetition ({ratio:.1%})",
                     section_key=key,
                     repetition_ratio=ratio
-                )
-
-            if not outline_has_section and outline:
-                report.add_warning(
-                    "SECTION_NOT_IN_OUTLINE",
-                    f"Section '{key}' generated but not in outline",
-                    section_key=key
                 )
 
         coverage_percent = round(required_present / required_total * 100, 1) if required_total > 0 else 100.0

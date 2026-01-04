@@ -5,13 +5,12 @@ from typing import Any
 from uuid import UUID
 
 from apps.projects.models import Document, DocumentArtifact
-from services.pipeline.ensure import ensure_artifact, get_success_artifact
+from services.pipeline.ensure import ensure_artifact, get_success_artifact, get_outline_artifact
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.schemas import (
     DocumentDraft, SectionDraft,
     document_draft_to_dict,
 )
-from services.pipeline.specs import get_all_section_keys
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +30,17 @@ def ensure_document_draft(
     def builder() -> dict[str, Any]:
         document = Document.objects.get(id=document_id)
 
-        outline_artifact = get_success_artifact(document_id, ArtifactKind.OUTLINE.value)
+        outline_artifact = get_outline_artifact(document_id)
         if not outline_artifact or not outline_artifact.data_json:
             raise ValueError(f"No outline found for document {document_id}")
 
         outline = outline_artifact.data_json
         title = outline.get("title", document.params.get("title", "Документ"))
 
-        section_keys = get_all_section_keys()
+        db_sections = {s.key: s for s in document.sections.order_by('order')}
         sections_draft: list[SectionDraft] = []
 
-        for order, key in enumerate(section_keys, start=1):
+        for order, (key, db_section) in enumerate(db_sections.items(), start=1):
             section_artifact = get_success_artifact(document_id, ArtifactKind.section(key))
             summary_artifact = get_success_artifact(document_id, ArtifactKind.section_summary(key))
 
@@ -61,11 +60,7 @@ def ensure_document_draft(
             if section_artifact.meta:
                 sources_used = section_artifact.meta.get("sources_used", [])
 
-            section_title = key
-            for s in outline.get("sections", []):
-                if s.get("key") == key:
-                    section_title = s.get("title", key)
-                    break
+            section_title = db_section.title or key
 
             sections_draft.append(SectionDraft(
                 key=key,

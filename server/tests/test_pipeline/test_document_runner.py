@@ -7,6 +7,7 @@ from apps.projects.models import Project, AnalysisRun, Artifact, Document, Secti
 from services.pipeline import (
     DocumentRunner,
     get_success_artifact,
+    get_outline_artifact,
     ArtifactKind,
     get_all_section_keys,
 )
@@ -79,7 +80,7 @@ class TestDocumentRunner:
         assert result.success is True
         assert len(result.errors) == 0
 
-        outline = get_success_artifact(document.id, ArtifactKind.OUTLINE.value)
+        outline = get_outline_artifact(document.id)
         assert outline is not None
 
         for key in get_all_section_keys():
