@@ -438,7 +438,7 @@ def pipeline_run_api(request):
 
             from services.pipeline.steps import ensure_outline_v2
 
-            if stop_after == 'outline':
+            if stop_after in ('outline', 'intro'):
                 outline_artifact = ensure_outline_v2(
                     document_id=document.id,
                     force=False,
@@ -461,6 +461,33 @@ def pipeline_run_api(request):
                     "document_id": str(document.id),
                     "stop_after": stop_after,
                 }
+
+                if stop_after == 'intro':
+                    from services.pipeline.steps import ensure_context_pack, ensure_section_text
+
+                    intro_section = document.sections.filter(key='intro').first()
+                    if intro_section:
+                        ensure_context_pack(
+                            document_id=document.id,
+                            section_key='intro',
+                            force=False,
+                        )
+
+                        section_artifact = ensure_section_text(
+                            document_id=document.id,
+                            section_key='intro',
+                            force=False,
+                            profile=profile,
+                            mock_mode=False,
+                        )
+
+                        intro_section.refresh_from_db()
+                        result["intro_section"] = {
+                            "key": intro_section.key,
+                            "title": intro_section.title,
+                            "text": intro_section.text_current or "",
+                            "word_count": len((intro_section.text_current or "").split()),
+                        }
 
                 new_llm_calls = LLMCall.objects.filter(created_at__gte=document.created_at)
                 total_tokens = sum(c.meta.get('total_tokens', 0) for c in new_llm_calls if c.meta)

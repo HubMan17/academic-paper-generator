@@ -52,9 +52,9 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
                                 <select id="textModel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <option value="">gpt-4o (default)</option>
+                                    <option value="">gpt-5.2 (default)</option>
+                                    <option value="gpt-4o">gpt-4o</option>
                                     <option value="gpt-4o-mini">gpt-4o-mini</option>
-                                    <option value="gpt-4-turbo">gpt-4-turbo</option>
                                 </select>
                             </div>
                             <div>
@@ -93,9 +93,9 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
                                 <select id="jsonModel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <option value="">gpt-4o (default)</option>
+                                    <option value="">gpt-5.2 (default)</option>
+                                    <option value="gpt-4o">gpt-4o</option>
                                     <option value="gpt-4o-mini">gpt-4o-mini</option>
-                                    <option value="gpt-4-turbo">gpt-4-turbo</option>
                                 </select>
                             </div>
                             <div>
@@ -380,7 +380,7 @@
                         </div>
 
                         <div class="flex items-center">
-                            <input type="checkbox" id="pipelineMockMode" checked class="mr-2">
+                            <input type="checkbox" id="pipelineMockMode" class="mr-2">
                             <label for="pipelineMockMode" class="text-sm text-gray-700">Mock Mode (без LLM)</label>
                         </div>
 
@@ -388,8 +388,9 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">Остановиться после</label>
                             <select id="pipelineStopAfter" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                                 <option value="">Полный пайплайн</option>
-                                <option value="outline" selected>Только Outline</option>
-                                <option value="sections">Outline + Sections</option>
+                                <option value="outline">Только Outline</option>
+                                <option value="intro" selected>Outline + Введение</option>
+                                <option value="sections">Outline + Все секции</option>
                             </select>
                         </div>
 
