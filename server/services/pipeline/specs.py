@@ -263,9 +263,10 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
 
     prev_key = "intro"
     theory_base_order = order
-    for i, (key, title) in enumerate(preset.theory_sections):
+    for i, (key, title, target_words) in enumerate(preset.theory_sections):
         full_key = f"theory_{key}"
         fact_tags = THEORY_SECTION_TAGS.get(key, ['tech_stack', 'frameworks'])
+        word_range = (max(400, target_words - 200), target_words + 200)
         sections.append(PipelineSectionSpec(
             key=full_key,
             title=f"1.{i+1} {title}",
@@ -274,7 +275,7 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
             depth=1,
             required=True,
             depends_on=[prev_key],
-            target_words=(600, 1200),
+            target_words=word_range,
             fact_tags=fact_tags,
             outline_mode=OutlineMode.STRUCTURE,
             needs_summaries=True,
@@ -284,9 +285,10 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
         order += 1
 
     practice_base_order = order
-    for i, (key, title) in enumerate(preset.practice_sections):
+    for i, (key, title, target_words) in enumerate(preset.practice_sections):
         full_key = f"practice_{key}"
         fact_tags = PRACTICE_SECTION_TAGS.get(key, ['modules', 'models'])
+        word_range = (max(400, target_words - 200), target_words + 200)
         sections.append(PipelineSectionSpec(
             key=full_key,
             title=f"2.{i+1} {title}",
@@ -295,7 +297,7 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
             depth=1,
             required=True,
             depends_on=[prev_key],
-            target_words=(700, 1500),
+            target_words=word_range,
             fact_tags=fact_tags,
             outline_mode=OutlineMode.LOCAL if key in ['implementation', 'testing'] else OutlineMode.STRUCTURE,
             needs_summaries=True,

@@ -83,14 +83,17 @@ class TestDocumentRunner:
         outline = get_outline_artifact(document.id)
         assert outline is not None
 
-        for key in get_all_section_keys():
-            context_pack = get_success_artifact(document.id, ArtifactKind.context_pack(key))
-            section = get_success_artifact(document.id, ArtifactKind.section(key))
-            summary = get_success_artifact(document.id, ArtifactKind.section_summary(key))
+        sections_with_special_handling = {'intro'}
 
-            assert context_pack is not None, f"Missing context_pack for {key}"
+        for key in get_all_section_keys():
+            section = get_success_artifact(document.id, ArtifactKind.section(key))
             assert section is not None, f"Missing section for {key}"
-            assert summary is not None, f"Missing summary for {key}"
+
+            if key not in sections_with_special_handling:
+                context_pack = get_success_artifact(document.id, ArtifactKind.context_pack(key))
+                summary = get_success_artifact(document.id, ArtifactKind.section_summary(key))
+                assert context_pack is not None, f"Missing context_pack for {key}"
+                assert summary is not None, f"Missing summary for {key}"
 
         draft = get_success_artifact(document.id, ArtifactKind.DOCUMENT_DRAFT.value)
         toc = get_success_artifact(document.id, ArtifactKind.TOC.value)

@@ -36,26 +36,26 @@ class TestCountWords:
 class TestDetectShortSections:
     def test_detect_short_section(self):
         sections = [
-            {"key": "intro", "text_current": "Короткий текст."},
+            {"key": "analysis", "text_current": "Короткий текст."},
         ]
         specs = [
-            {"key": "intro", "target_words_min": 500, "target_words_max": 1000},
+            {"key": "analysis", "target_words_min": 500, "target_words_max": 1000},
         ]
 
         plan = detect_short_sections(sections, specs)
 
         assert plan.needs_enrichment()
         assert len(plan.sections_to_enrich) == 1
-        assert plan.sections_to_enrich[0].section_key == "intro"
+        assert plan.sections_to_enrich[0].section_key == "analysis"
         assert plan.sections_to_enrich[0].deficit_words > 0
 
     def test_no_enrichment_needed(self):
         long_text = "Слово " * 600
         sections = [
-            {"key": "intro", "text_current": long_text},
+            {"key": "analysis", "text_current": long_text},
         ]
         specs = [
-            {"key": "intro", "target_words_min": 500, "target_words_max": 1000},
+            {"key": "analysis", "target_words_min": 500, "target_words_max": 1000},
         ]
 
         plan = detect_short_sections(sections, specs)
@@ -65,12 +65,12 @@ class TestDetectShortSections:
 
     def test_multiple_sections(self):
         sections = [
-            {"key": "intro", "text_current": "Короткий текст."},
+            {"key": "analysis", "text_current": "Короткий текст."},
             {"key": "theory", "text_current": "Слово " * 600},
             {"key": "practice", "text_current": "Ещё короткий."},
         ]
         specs = [
-            {"key": "intro", "target_words_min": 500, "target_words_max": 1000},
+            {"key": "analysis", "target_words_min": 500, "target_words_max": 1000},
             {"key": "theory", "target_words_min": 500, "target_words_max": 1000},
             {"key": "practice", "target_words_min": 400, "target_words_max": 800},
         ]
@@ -80,17 +80,17 @@ class TestDetectShortSections:
         assert plan.needs_enrichment()
         assert len(plan.sections_to_enrich) == 2
         keys = [n.section_key for n in plan.sections_to_enrich]
-        assert "intro" in keys
+        assert "analysis" in keys
         assert "practice" in keys
         assert "theory" not in keys
 
     def test_priority_ordering(self):
         sections = [
-            {"key": "intro", "text_current": "Немного текста здесь."},
+            {"key": "analysis", "text_current": "Немного текста здесь."},
             {"key": "theory", "text_current": "Слово."},
         ]
         specs = [
-            {"key": "intro", "target_words_min": 500, "target_words_max": 1000},
+            {"key": "analysis", "target_words_min": 500, "target_words_max": 1000},
             {"key": "theory", "target_words_min": 500, "target_words_max": 1000},
         ]
 
@@ -101,17 +101,36 @@ class TestDetectShortSections:
 
     def test_missing_section_in_specs(self):
         sections = [
-            {"key": "intro", "text_current": "Текст."},
+            {"key": "analysis", "text_current": "Текст."},
             {"key": "unknown", "text_current": "Неизвестная секция."},
         ]
         specs = [
-            {"key": "intro", "target_words_min": 500, "target_words_max": 1000},
+            {"key": "analysis", "target_words_min": 500, "target_words_max": 1000},
         ]
 
         plan = detect_short_sections(sections, specs)
 
         keys = [n.section_key for n in plan.sections_to_enrich]
         assert "unknown" not in keys
+
+    def test_intro_and_conclusion_skipped(self):
+        sections = [
+            {"key": "intro", "text_current": "Короткий текст."},
+            {"key": "conclusion", "text_current": "Короткий вывод."},
+            {"key": "analysis", "text_current": "Короткий анализ."},
+        ]
+        specs = [
+            {"key": "intro", "target_words_min": 500, "target_words_max": 1000},
+            {"key": "conclusion", "target_words_min": 300, "target_words_max": 600},
+            {"key": "analysis", "target_words_min": 500, "target_words_max": 1000},
+        ]
+
+        plan = detect_short_sections(sections, specs)
+
+        keys = [n.section_key for n in plan.sections_to_enrich]
+        assert "intro" not in keys
+        assert "conclusion" not in keys
+        assert "analysis" in keys
 
 
 class TestSelectRelevantFacts:

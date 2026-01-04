@@ -20,6 +20,7 @@ from services.pipeline.steps import (
     ensure_quality_report,
     ensure_enrichment,
     ensure_literature,
+    ensure_intro_academic,
 )
 
 logger = logging.getLogger(__name__)
@@ -291,6 +292,10 @@ class DocumentRunner:
         self._track_artifact(kind, was_cached=(existing is not None and not force))
 
     def _run_section_full(self, key: str, job_id: UUID | None, force: bool):
+        if key == 'intro':
+            self._run_intro_academic(job_id, force)
+            return
+
         cp_kind = ArtifactKind.context_pack(key)
         existing_cp = get_success_artifact(self.document_id, cp_kind)
 
@@ -328,6 +333,19 @@ class DocumentRunner:
             mock_mode=self.mock_mode,
         )
         self._track_artifact(summary_kind, was_cached=(existing_summary is not None and not force))
+
+    def _run_intro_academic(self, job_id: UUID | None, force: bool):
+        section_kind = ArtifactKind.section('intro')
+        existing_section = get_success_artifact(self.document_id, section_kind)
+
+        ensure_intro_academic(
+            document_id=self.document_id,
+            force=force,
+            job_id=job_id,
+            profile=self.profile,
+            mock_mode=self.mock_mode,
+        )
+        self._track_artifact(section_kind, was_cached=(existing_section is not None and not force))
 
     def _run_assemble(self, job_id: UUID | None, force: bool):
         kind = ArtifactKind.DOCUMENT_DRAFT.value

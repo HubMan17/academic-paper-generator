@@ -3,6 +3,8 @@ from typing import Any
 
 from services.enrichment.schema import EnrichmentNeed, EnrichmentPlan
 
+SKIP_ENRICHMENT_SECTIONS = {'intro', 'conclusion', 'toc', 'literature'}
+
 
 def count_words(text: str) -> int:
     if not text:
@@ -22,6 +24,9 @@ def detect_short_sections(
 
     for section in sections:
         key = section.get('key', '')
+        if key in SKIP_ENRICHMENT_SECTIONS:
+            continue
+
         text = section.get('text', '') or section.get('text_current', '')
         current_words = count_words(text)
 

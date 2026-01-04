@@ -230,6 +230,7 @@ class Section(models.Model):
     key = models.CharField(max_length=50)
     title = models.CharField(max_length=200, blank=True)
     chapter_key = models.CharField(max_length=50, blank=True, default='')
+    parent_key = models.CharField(max_length=50, blank=True, default='')
     depth = models.IntegerField(default=1)
     order = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.IDLE)

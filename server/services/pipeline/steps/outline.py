@@ -29,33 +29,59 @@ OUTLINE_SYSTEM = """Ты технический писатель для акад
     ]
 }"""
 
-OUTLINE_V2_SYSTEM = """Ты технический писатель для академических работ.
-Генерируй структурированный план документа в JSON формате v2.
+OUTLINE_V2_SYSTEM = """Ты методист-составитель учебных планов для ВУЗов.
+Создай детальный план работы, как это принято в российских университетах.
 
-ВАЖНО: Структура должна соответствовать указанному типу работы и содержать главы с секциями.
+ВАЖНЫЕ ПРАВИЛА:
+1. Структура должна соответствовать типу работы (реферат, курсовая, диплом).
+2. Каждый раздел должен быть логически завершённым и понятным.
+3. Названия разделов должны быть конкретными, не абстрактными.
+4. Для курсовых и дипломов теория разбивается на подпункты (1.1.1, 1.1.2).
+5. Для рефератов подпункты НЕ нужны - это короткая работа.
 
-Формат ответа:
+Формат JSON:
 {
     "version": "v2",
     "title": "Название работы",
-    "work_type": "diploma",
+    "work_type": "course",
     "chapters": [
-        {
-            "key": "toc",
-            "title": "Содержание",
-            "is_auto": true
-        },
+        {"key": "toc", "title": "Содержание", "is_auto": true},
         {
             "key": "intro",
             "title": "Введение",
-            "points": ["Актуальность", "Цели и задачи", "Объект и предмет"]
+            "points": ["Актуальность темы", "Цель и задачи работы", "Объект и предмет исследования"]
         },
         {
             "key": "theory",
             "title": "Теоретическая часть",
             "sections": [
-                {"key": "concepts", "title": "1.1 Основные понятия", "points": ["..."]},
-                {"key": "technologies", "title": "1.2 Обзор технологий", "points": ["..."]}
+                {
+                    "key": "paradigms",
+                    "title": "1.1 Парадигмы программирования и место ООП",
+                    "subsections": [
+                        {"key": "paradigms_intro", "title": "1.1.1 Понятие парадигмы программирования"},
+                        {"key": "paradigms_oop", "title": "1.1.2 Причины появления объектно-ориентированного подхода"}
+                    ]
+                },
+                {
+                    "key": "oop_basics",
+                    "title": "1.2 Базовые понятия ООП",
+                    "subsections": [
+                        {"key": "oop_class", "title": "1.2.1 Объект и класс"},
+                        {"key": "oop_attrs", "title": "1.2.2 Атрибуты и методы"},
+                        {"key": "oop_interface", "title": "1.2.3 Интерфейс и контракт"}
+                    ]
+                },
+                {
+                    "key": "oop_principles",
+                    "title": "1.3 Основные принципы ООП",
+                    "subsections": [
+                        {"key": "encapsulation", "title": "1.3.1 Инкапсуляция"},
+                        {"key": "inheritance", "title": "1.3.2 Наследование"},
+                        {"key": "polymorphism", "title": "1.3.3 Полиморфизм"},
+                        {"key": "abstraction", "title": "1.3.4 Абстракция"}
+                    ]
+                }
             ]
         },
         {
@@ -63,23 +89,19 @@ OUTLINE_V2_SYSTEM = """Ты технический писатель для ак�
             "title": "Практическая часть",
             "sections": [
                 {"key": "analysis", "title": "2.1 Анализ требований", "points": ["..."]},
-                {"key": "architecture", "title": "2.2 Архитектура", "points": ["..."]},
+                {"key": "architecture", "title": "2.2 Архитектура системы", "points": ["..."]},
                 {"key": "implementation", "title": "2.3 Реализация", "points": ["..."]},
                 {"key": "testing", "title": "2.4 Тестирование", "points": ["..."]}
             ]
         },
-        {
-            "key": "conclusion",
-            "title": "Заключение",
-            "points": ["Выводы", "Перспективы развития"]
-        },
-        {
-            "key": "literature",
-            "title": "Список литературы",
-            "is_auto": true
-        }
+        {"key": "conclusion", "title": "Заключение", "points": ["Выводы", "Перспективы"]},
+        {"key": "literature", "title": "Список литературы", "is_auto": true}
     ]
-}"""
+}
+
+ВАЖНО:
+- Для курсовых и дипломов используй subsections для детализации теории.
+- Для рефератов НЕ используй subsections - просто sections с points."""
 
 OUTLINE_V2_USER_TEMPLATE = """На основе анализа репозитория:
 {facts_json}
@@ -93,10 +115,14 @@ OUTLINE_V2_USER_TEMPLATE = """На основе анализа репозито�
 - Язык: {language}
 - Уровень стиля: {style_level}
 
+Бюджет по словам:
+- Теоретическая часть: ~{theory_words_budget} слов ВСЕГО
+- Практическая часть: ~{practice_words_budget} слов ВСЕГО
+
 Структура должна включать:
 - Теоретическая часть: {theory_count} секций
 - Практическая часть: {practice_count} секций
-
+{subsections_note}
 Создай детальный план (outline) с конкретными пунктами (points) для каждой секции.
 Пункты должны отражать реальное содержание на основе facts."""
 
@@ -125,7 +151,7 @@ MOCK_OUTLINE = {
 MOCK_OUTLINE_V2 = {
     "version": "v2",
     "title": "Анализ программного обеспечения",
-    "work_type": "course",
+    "work_type": "referat",
     "chapters": [
         {"key": "toc", "title": "Содержание", "is_auto": True},
         {"key": "intro", "title": "Введение", "points": ["Актуальность", "Цели и задачи"]},
@@ -133,17 +159,30 @@ MOCK_OUTLINE_V2 = {
             "key": "theory",
             "title": "Теоретическая часть",
             "sections": [
-                {"key": "concepts", "title": "1.1 Основные понятия", "points": ["Определения", "Терминология"]},
-                {"key": "technologies", "title": "1.2 Обзор технологий", "points": ["Фреймворки", "Инструменты"]},
+                {
+                    "key": "concepts",
+                    "title": "1.1 Основные понятия и принципы",
+                    "subsections": [
+                        {"key": "concepts_definitions", "title": "1.1.1 Определения и терминология", "points": ["Ключевые термины"]},
+                        {"key": "concepts_basics", "title": "1.1.2 Базовые концепции", "points": ["Фундаментальные принципы"]},
+                    ]
+                },
+                {
+                    "key": "approaches",
+                    "title": "1.2 Подходы к решению задачи",
+                    "subsections": [
+                        {"key": "approaches_methods", "title": "1.2.1 Существующие методы", "points": ["Обзор подходов"]},
+                        {"key": "approaches_choice", "title": "1.2.2 Критерии выбора", "points": ["Обоснование"]},
+                    ]
+                },
             ]
         },
         {
             "key": "practice",
             "title": "Практическая часть",
             "sections": [
-                {"key": "analysis", "title": "2.1 Анализ требований", "points": ["Требования", "Бизнес-логика"]},
-                {"key": "architecture", "title": "2.2 Архитектура", "points": ["Компоненты", "Связи"]},
-                {"key": "implementation", "title": "2.3 Реализация", "points": ["Алгоритмы", "Код"]},
+                {"key": "analysis", "title": "2.1 Анализ предметной области", "points": ["Требования", "Бизнес-логика"]},
+                {"key": "implementation", "title": "2.2 Практическое применение", "points": ["Реализация", "Результаты"]},
             ]
         },
         {"key": "conclusion", "title": "Заключение", "points": ["Выводы", "Перспективы"]},
@@ -183,19 +222,36 @@ def create_sections_from_outline(document: Document, outline_data: dict) -> list
 
             if 'sections' in chapter:
                 for sec in chapter['sections']:
-                    key = sec.get('key', '')
-                    if key and key not in existing_keys:
+                    sec_key = sec.get('key', '')
+                    if sec_key and sec_key not in existing_keys:
                         section = Section.objects.create(
                             document=document,
-                            key=key,
+                            key=sec_key,
                             chapter_key=chapter_key,
-                            title=sec.get('title', key),
+                            title=sec.get('title', sec_key),
                             order=order,
                             depth=2,
                         )
                         created_sections.append(section)
-                        existing_keys.add(key)
+                        existing_keys.add(sec_key)
                         order += 1
+
+                    if 'subsections' in sec:
+                        for subsec in sec['subsections']:
+                            subsec_key = subsec.get('key', '')
+                            if subsec_key and subsec_key not in existing_keys:
+                                subsection = Section.objects.create(
+                                    document=document,
+                                    key=subsec_key,
+                                    chapter_key=chapter_key,
+                                    parent_key=sec_key,
+                                    title=subsec.get('title', subsec_key),
+                                    order=order,
+                                    depth=3,
+                                )
+                                created_sections.append(subsection)
+                                existing_keys.add(subsec_key)
+                                order += 1
             else:
                 key = chapter_key
                 if key and key not in existing_keys:
@@ -276,11 +332,13 @@ def ensure_outline(
                 params=json.dumps(document.params, ensure_ascii=False)
             )
 
+            outline_max_tokens = max(4000, prof.default_budget.max_output_tokens * 2)
+
             result = llm_client.generate_json(
                 system=OUTLINE_SYSTEM,
                 user=user_prompt,
                 temperature=prof.default_budget.temperature * 0.5,
-                max_tokens=prof.default_budget.max_output_tokens,
+                max_tokens=outline_max_tokens,
             )
             outline_data = result.data
             meta = {
@@ -368,6 +426,15 @@ def ensure_outline_v2(
             facts = get_facts(document)
             llm_client = LLMClient()
 
+            subsections_note = ""
+            if preset.use_subsections:
+                if work_type == 'referat':
+                    subsections_note = "\nВАЖНО: Теоретические секции должны содержать subsections (2-3 подпункта на секцию). Общий объём ВСЕЙ теории: 1100-1500 слов.\n"
+                else:
+                    subsections_note = "\nВАЖНО: Теоретические секции должны содержать subsections (подпункты 1.1.1, 1.1.2, ...).\n"
+            else:
+                subsections_note = "\nВАЖНО: НЕ используй subsections - работа слишком короткая. Только sections с points.\n"
+
             user_prompt = OUTLINE_V2_USER_TEMPLATE.format(
                 facts_json=json.dumps(facts, ensure_ascii=False, indent=2)[:8000],
                 work_type_name=preset.name,
@@ -379,16 +446,21 @@ def ensure_outline_v2(
                 style_level=style_level,
                 theory_count=preset.theory_depth,
                 practice_count=preset.practice_depth,
+                theory_words_budget=preset.theory_words_budget,
+                practice_words_budget=preset.practice_words_budget,
+                subsections_note=subsections_note,
             )
 
             logger.info(f"Generating outline v2 for document {document_id}")
             logger.debug(f"User prompt length: {len(user_prompt)} chars")
 
+            outline_max_tokens = max(4000, prof.default_budget.max_output_tokens * 2)
+
             result = llm_client.generate_json(
                 system=OUTLINE_V2_SYSTEM,
                 user=user_prompt,
                 temperature=prof.default_budget.temperature * 0.5,
-                max_tokens=prof.default_budget.max_output_tokens,
+                max_tokens=outline_max_tokens,
             )
             outline_data = result.data
             logger.info(f"Outline v2 generated successfully, {len(outline_data.get('chapters', []))} chapters")
@@ -447,14 +519,14 @@ def build_outline_v2_from_preset(
     theory_sections = []
     practice_sections = []
 
-    for i, (key, title) in enumerate(preset.theory_sections):
+    for i, (key, title, _) in enumerate(preset.theory_sections):
         theory_sections.append({
             "key": key,
             "title": f"1.{i+1} {title}",
             "points": []
         })
 
-    for i, (key, title) in enumerate(preset.practice_sections):
+    for i, (key, title, _) in enumerate(preset.practice_sections):
         practice_sections.append({
             "key": key,
             "title": f"2.{i+1} {title}",

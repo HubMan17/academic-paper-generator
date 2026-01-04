@@ -7,6 +7,9 @@ from services.pipeline.steps.toc import ensure_toc
 from services.pipeline.steps.quality import ensure_quality_report
 from services.pipeline.steps.enrichment import ensure_enrichment, ensure_section_enrichment
 from services.pipeline.steps.literature import ensure_literature, format_literature_text
+from services.pipeline.steps.intro_academic import ensure_intro_academic, validate_intro_quality
+from services.pipeline.steps.theory_academic import ensure_theory_section, validate_theory_quality
+from services.pipeline.steps.practice_academic import ensure_practice_section, validate_practice_quality
 
 __all__ = [
     "ensure_outline",
@@ -22,4 +25,10 @@ __all__ = [
     "ensure_section_enrichment",
     "ensure_literature",
     "format_literature_text",
+    "ensure_intro_academic",
+    "validate_intro_quality",
+    "ensure_theory_section",
+    "validate_theory_quality",
+    "ensure_practice_section",
+    "validate_practice_quality",
 ]

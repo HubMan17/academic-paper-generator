@@ -390,6 +390,10 @@
                                 <option value="">Полный пайплайн</option>
                                 <option value="outline">Только Outline</option>
                                 <option value="intro" selected>Outline + Введение</option>
+                                <option value="intro_theory">Outline + Введение + Теория</option>
+                                <option value="theory">Outline + Теория (без введения)</option>
+                                <option value="practice">Outline + Практика (без введения)</option>
+                                <option value="intro_practice">Outline + Введение + Практика</option>
                                 <option value="sections">Outline + Все секции</option>
                             </select>
                         </div>
@@ -467,6 +471,7 @@
                                         <p class="text-xs text-gray-500">cost</p>
                                     </div>
                                 </div>
+                                <p class="text-xs text-gray-500 mt-2" id="pipelineModel"></p>
                             </div>
                             <div class="mt-2 text-xs text-gray-500 text-center" id="pipelineDuration"></div>
                         </div>
@@ -498,9 +503,14 @@
                             <pre id="pipelineQuality" class="bg-gray-50 p-2 rounded text-xs max-h-32 overflow-y-auto"></pre>
                         </div>
 
-                        <button onclick="downloadPipelineResult()" class="w-full bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 text-sm">
-                            Скачать результат
-                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="downloadPipelineResult()" class="flex-1 bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 text-sm">
+                                JSON
+                            </button>
+                            <button onclick="downloadPipelineDocx()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 text-sm">
+                                Word
+                            </button>
+                        </div>
                     </div>
 
                     <div id="pipelineEmpty" class="text-center py-12 text-gray-500">
@@ -1089,6 +1099,7 @@
                 document.getElementById('pipelineLlmCalls').textContent = result.usage.llm_calls || 0;
                 document.getElementById('pipelineTotalTokens').textContent = (result.usage.total_tokens || 0).toLocaleString();
                 document.getElementById('pipelineTotalCost').textContent = '$' + (result.usage.total_cost || 0).toFixed(4);
+                document.getElementById('pipelineModel').textContent = result.usage.model || '';
                 document.getElementById('pipelineUsage').classList.remove('hidden');
             } else {
                 document.getElementById('pipelineUsage').classList.add('hidden');
@@ -1114,6 +1125,34 @@
             a.download = 'document_result.json';
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        async function downloadPipelineDocx() {
+            if (!pipelineData) return;
+
+            try {
+                const response = await fetch('/api/v1/pipeline/docx/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(pipelineData),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate DOCX');
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'document.docx';
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Error generating DOCX: ' + err.message);
+            }
         }
     </script>
 </body>
