@@ -14,25 +14,9 @@ from services.pipeline.profiles import get_profile
 from services.pipeline.specs import get_section_spec
 from services.prompting.schema import SectionOutputReport, SECTION_OUTPUT_SCHEMA
 
+from services.pipeline.mocks import MOCK_SECTION_TEXT
+
 logger = logging.getLogger(__name__)
-
-MOCK_SECTION_TEXT = """# {title}
-
-Это тестовый контент для секции **{key}**.
-
-## Содержание
-
-Данный раздел содержит описание {key} части работы.
-Текст сгенерирован в режиме MOCK для тестирования.
-
-### Основные пункты
-
-1. Первый пункт раздела
-2. Второй пункт раздела
-3. Третий пункт раздела
-
-Более подробное содержание будет добавлено при реальной генерации.
-"""
 
 
 def count_words(text: str) -> int:

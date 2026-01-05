@@ -1,3 +1,13 @@
+"""
+DEPRECATED: This module is legacy. Use services.pipeline for new development.
+
+These prompts are kept for backward compatibility with DocumentService.
+New pipeline uses:
+- services.pipeline.steps.outline.OUTLINE_V2_SYSTEM
+- services.prompting.assembler for section prompts
+- services.pipeline.mocks for mock data
+"""
+
 OUTLINE_SYSTEM = """Ты технический писатель для академических работ.
 Генерируй структурированный план документа в JSON формате.
 Формат ответа:

@@ -221,60 +221,7 @@ OUTLINE_USER_TEMPLATE = """На основе анализа репозитори
 Дополнительные параметры: {params}
 """
 
-MOCK_OUTLINE = {
-    "title": "Анализ программного обеспечения",
-    "sections": [
-        {"key": "intro", "title": "Введение", "points": ["Актуальность", "Цели и задачи"]},
-        {"key": "theory", "title": "Теоретическая часть", "points": ["Обзор технологий"]},
-        {"key": "analysis", "title": "Анализ предметной области", "points": ["Требования", "Бизнес-логика"]},
-        {"key": "architecture", "title": "Архитектура системы", "points": ["Компоненты", "Связи"]},
-        {"key": "implementation", "title": "Реализация", "points": ["Алгоритмы", "Код"]},
-        {"key": "testing", "title": "Тестирование", "points": ["Стратегия", "Результаты"]},
-        {"key": "conclusion", "title": "Заключение", "points": ["Выводы", "Перспективы"]},
-    ]
-}
-
-MOCK_OUTLINE_V2 = {
-    "version": "v2",
-    "title": "Анализ программного обеспечения",
-    "work_type": "referat",
-    "chapters": [
-        {"key": "toc", "title": "Содержание", "is_auto": True},
-        {"key": "intro", "title": "Введение", "points": ["Актуальность", "Цели и задачи"]},
-        {
-            "key": "theory",
-            "title": "Теоретическая часть",
-            "sections": [
-                {
-                    "key": "concepts",
-                    "title": "1.1 Основные понятия и принципы",
-                    "subsections": [
-                        {"key": "concepts_definitions", "title": "1.1.1 Определения и терминология", "points": ["Ключевые термины"]},
-                        {"key": "concepts_basics", "title": "1.1.2 Базовые концепции", "points": ["Фундаментальные принципы"]},
-                    ]
-                },
-                {
-                    "key": "approaches",
-                    "title": "1.2 Подходы к решению задачи",
-                    "subsections": [
-                        {"key": "approaches_methods", "title": "1.2.1 Существующие методы", "points": ["Обзор подходов"]},
-                        {"key": "approaches_choice", "title": "1.2.2 Критерии выбора", "points": ["Обоснование"]},
-                    ]
-                },
-            ]
-        },
-        {
-            "key": "practice",
-            "title": "Практическая часть",
-            "sections": [
-                {"key": "analysis", "title": "2.1 Анализ предметной области", "points": ["Требования", "Бизнес-логика"]},
-                {"key": "implementation", "title": "2.2 Практическое применение", "points": ["Реализация", "Результаты"]},
-            ]
-        },
-        {"key": "conclusion", "title": "Заключение", "points": ["Выводы", "Перспективы"]},
-        {"key": "literature", "title": "Список литературы", "is_auto": True},
-    ]
-}
+from services.pipeline.mocks import MOCK_OUTLINE_V1 as MOCK_OUTLINE, MOCK_OUTLINE_V2
 
 
 PRACTICE_SECTION_KEYS = {'analysis', 'architecture', 'implementation', 'testing', 'design', 'development'}

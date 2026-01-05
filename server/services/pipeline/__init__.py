@@ -7,6 +7,7 @@ from services.pipeline.schemas import (
 from services.pipeline.specs import (
     PipelineSectionSpec, DocumentSpec, SectionBudget,
     get_section_spec, get_all_section_keys,
+    get_allowed_section_keys, get_allowed_chapter_keys,
     SECTION_REGISTRY, DEFAULT_SECTIONS,
 )
 from services.pipeline.profiles import (
@@ -39,6 +40,8 @@ __all__ = [
     "SectionBudget",
     "get_section_spec",
     "get_all_section_keys",
+    "get_allowed_section_keys",
+    "get_allowed_chapter_keys",
     "SECTION_REGISTRY",
     "DEFAULT_SECTIONS",
     "GenerationProfile",
