@@ -146,7 +146,7 @@ def validate_conclusion_quality(
 
 
 def get_section_summaries(document: Document, chapter_key: str) -> str:
-    sections = document.sections.filter(chapter_key=chapter_key).order_by('order_index')
+    sections = document.sections.filter(chapter_key=chapter_key).order_by('order')
 
     summaries = []
     for section in sections:
