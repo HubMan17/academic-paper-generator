@@ -340,3 +340,16 @@ def get_sections_by_chapter(sections: list[PipelineSectionSpec]) -> dict[str, li
             result[chapter] = []
         result[chapter].append(spec)
     return result
+
+
+def get_allowed_section_keys(work_type: str) -> set[str]:
+    sections = get_sections_for_work_type(work_type)
+    allowed = {spec.key for spec in sections}
+    allowed.add('toc')
+    allowed.add('literature')
+    allowed.add('appendix')
+    return allowed
+
+
+def get_allowed_chapter_keys() -> set[str]:
+    return {'toc', 'intro', 'theory', 'practice', 'conclusion', 'literature', 'appendix'}

@@ -9,7 +9,7 @@ from services.pipeline.ensure import ensure_artifact
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.profiles import GenerationProfile, get_profile
 from services.pipeline.work_types import get_work_type_preset
-from services.pipeline.specs import get_sections_for_work_type
+from services.pipeline.specs import get_sections_for_work_type, get_allowed_section_keys, get_allowed_chapter_keys
 from services.pipeline.facts_sanitizer import sanitize_facts_for_llm
 
 logger = logging.getLogger(__name__)
@@ -501,6 +501,64 @@ def validate_outline_structure(outline_data: dict) -> tuple[bool, list[str]]:
     return (len(errors) == 0, errors)
 
 
+def normalize_section_key(key: str, chapter_key: str, index: int) -> str:
+    if chapter_key == 'theory' and not key.startswith('theory_'):
+        return f"theory_{index + 1}"
+    if chapter_key == 'practice' and not key.startswith('practice_'):
+        return f"practice_{index + 1}"
+    return key
+
+
+def filter_outline_sections(outline_data: dict, work_type: str) -> tuple[dict, list[str]]:
+    if outline_data.get('version') != 'v2' and 'chapters' not in outline_data:
+        return outline_data, []
+
+    allowed_keys = get_allowed_section_keys(work_type)
+    allowed_chapter_keys = get_allowed_chapter_keys()
+    filtered_chapters = []
+    warnings = []
+
+    for chapter in outline_data.get('chapters', []):
+        chapter_key = chapter.get('key', '')
+
+        if chapter_key not in allowed_chapter_keys:
+            warnings.append(f"Removed unknown chapter: {chapter_key}")
+            continue
+
+        if 'sections' not in chapter:
+            filtered_chapters.append(chapter)
+            continue
+
+        filtered_sections = []
+        for idx, section in enumerate(chapter.get('sections', [])):
+            section_key = section.get('key', '')
+
+            if section_key in allowed_keys:
+                filtered_sections.append(section)
+            else:
+                normalized = normalize_section_key(section_key, chapter_key, idx)
+                if normalized in allowed_keys:
+                    section = section.copy()
+                    section['key'] = normalized
+                    section['_original_key'] = section_key
+                    filtered_sections.append(section)
+                    warnings.append(f"Normalized section key '{section_key}' -> '{normalized}'")
+                else:
+                    warnings.append(f"Removed unknown section: {section_key} (chapter: {chapter_key})")
+
+        chapter = chapter.copy()
+        chapter['sections'] = filtered_sections
+        filtered_chapters.append(chapter)
+
+    result = outline_data.copy()
+    result['chapters'] = filtered_chapters
+
+    if warnings:
+        logger.warning(f"Outline key filtering: {warnings}")
+
+    return result, warnings
+
+
 def ensure_outline_v2(
     document_id: UUID,
     *,
@@ -589,6 +647,10 @@ def ensure_outline_v2(
             outline_data = result.data
             logger.info(f"Outline v2 generated successfully, {len(outline_data.get('chapters', []))} chapters")
 
+            outline_data, filter_warnings = filter_outline_sections(outline_data, work_type)
+            if filter_warnings:
+                logger.info(f"Outline key filtering applied: {filter_warnings}")
+
             valid, validation_errors = validate_outline_structure(outline_data)
             if not valid:
                 error_msg = f"Outline validation failed: {'; '.join(validation_errors)}"
@@ -609,6 +671,7 @@ def ensure_outline_v2(
                 "cost_estimate": result.meta.cost_estimate,
                 "profile": profile,
                 "work_type": work_type,
+                "filter_warnings": filter_warnings if filter_warnings else None,
             }
 
         document.outline_current = None
