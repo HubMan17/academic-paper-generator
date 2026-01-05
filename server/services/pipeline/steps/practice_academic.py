@@ -131,6 +131,8 @@ def get_section_points_from_outline(document: Document, section_key: str) -> tup
 
 
 def get_facts_summary(document: Document, section_key: str) -> str:
+    from services.pipeline.facts_sanitizer import sanitize_facts_for_llm, get_sanitized_facts_summary
+
     try:
         artifact = Artifact.objects.filter(
             analysis_run=document.analysis_run,
@@ -141,56 +143,8 @@ def get_facts_summary(document: Document, section_key: str) -> str:
             return "Информация о проекте не доступна"
 
         facts = artifact.data
-        summary_parts = []
-
-        if section_key in ('analysis', 'requirements'):
-            if facts.get('summary'):
-                summary_parts.append(f"Описание: {facts['summary']}")
-            if facts.get('primary_language'):
-                summary_parts.append(f"Основной язык: {facts['primary_language']}")
-            if facts.get('frameworks'):
-                summary_parts.append(f"Фреймворки: {', '.join(facts['frameworks'][:5])}")
-
-        elif section_key in ('architecture', 'design'):
-            if facts.get('architecture'):
-                arch = facts['architecture']
-                if arch.get('type'):
-                    summary_parts.append(f"Архитектура: {arch['type']}")
-                if arch.get('evidence'):
-                    summary_parts.append(f"Признаки: {', '.join(arch['evidence'][:3])}")
-            if facts.get('modules'):
-                modules = facts['modules'][:5]
-                summary_parts.append(f"Модули: {', '.join(m.get('name', '') for m in modules)}")
-
-        elif section_key in ('implementation', 'development'):
-            if facts.get('routes'):
-                routes = facts['routes'][:5]
-                summary_parts.append(f"API endpoints: {len(facts['routes'])} маршрутов")
-            if facts.get('models'):
-                models = facts['models'][:5]
-                summary_parts.append(f"Модели данных: {', '.join(m.get('name', '') for m in models)}")
-            if facts.get('loc_by_language'):
-                loc = facts['loc_by_language']
-                summary_parts.append(f"Объём кода: {sum(loc.values())} строк")
-
-        elif section_key in ('testing', 'quality'):
-            if facts.get('test_files'):
-                summary_parts.append(f"Тестовые файлы: {len(facts['test_files'])} файлов")
-            if facts.get('dependencies'):
-                test_deps = [d for d in facts['dependencies'] if 'test' in d.lower() or 'pytest' in d.lower()]
-                if test_deps:
-                    summary_parts.append(f"Тестовые зависимости: {', '.join(test_deps[:3])}")
-
-        else:
-            if facts.get('summary'):
-                summary_parts.append(f"Описание: {facts['summary']}")
-            if facts.get('primary_language'):
-                summary_parts.append(f"Язык: {facts['primary_language']}")
-
-        if not summary_parts:
-            return json.dumps(facts, ensure_ascii=False, indent=2)[:2000]
-
-        return "\n".join(summary_parts)
+        clean_facts = sanitize_facts_for_llm(facts)
+        return get_sanitized_facts_summary(clean_facts, section_key)
 
     except Exception as e:
         logger.warning(f"Failed to get facts summary: {e}")
@@ -242,7 +196,11 @@ def ensure_practice_section(
 
         facts_summary = get_facts_summary(document, section_key)
 
-        preset_target = preset.get_section_target_words(section_key)
+        if section_key.startswith('practice_') and '_' in section_key:
+            section_index = int(section_key.split('_')[1]) - 1
+        else:
+            section_index = 0
+        preset_target = preset.get_section_target_words('practice', section_index)
 
         if is_subsection:
             limits = PRACTICE_SUBSECTION_WORD_LIMITS.get(work_type_key, PRACTICE_SUBSECTION_WORD_LIMITS["course"])

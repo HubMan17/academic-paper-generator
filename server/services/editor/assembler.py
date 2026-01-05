@@ -6,6 +6,7 @@ from .schema import (
     QualityReport,
 )
 from .analyzer import analyze_document
+from services.pipeline.text_sanitizer import sanitize_section_text
 
 
 def assemble_document(
@@ -27,12 +28,14 @@ def assemble_document(
         else:
             text = section.get("text", "")
 
+        text = sanitize_section_text(text, key)
+
         if key in transitions_by_from:
             transition = transitions_by_from[key]
             text = text.rstrip() + "\n\n" + transition.text
 
         if key == "conclusion" and final_conclusion:
-            text = final_conclusion
+            text = sanitize_section_text(final_conclusion, key)
 
         sections_dict[key] = text
 
