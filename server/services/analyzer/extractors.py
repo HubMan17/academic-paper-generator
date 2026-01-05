@@ -451,11 +451,11 @@ def extract_django_models(repo_path: Path) -> list[DjangoModel]:
         r'^\s+(\w+)\s*=\s*models\.(\w+)\s*\(([^)]*)\)',
         re.MULTILINE
     )
-    fk_pattern = re.compile(
-        r'models\.(?:ForeignKey|OneToOneField)\s*\(\s*["\']?(\w+)["\']?'
+    fk_target_pattern = re.compile(
+        r'^["\']?(\w+)["\']?'
     )
-    m2m_pattern = re.compile(
-        r'models\.ManyToManyField\s*\(\s*["\']?(\w+)["\']?'
+    m2m_target_pattern = re.compile(
+        r'^["\']?(\w+)["\']?'
     )
     choices_pattern = re.compile(
         r'class\s+(\w+)\s*\([^)]*(?:TextChoices|IntegerChoices|Choices)[^)]*\)'
@@ -504,16 +504,18 @@ def extract_django_models(repo_path: Path) -> list[DjangoModel]:
 
                     field_info = {"name": field_name, "type": field_type}
 
-                    fk_match = fk_pattern.search(field_args) if "ForeignKey" in field_type or "OneToOne" in field_type else None
-                    if fk_match:
-                        target = fk_match.group(1)
-                        relationships.append({"name": field_name, "target": target, "type": field_type})
-                        field_info["foreign_key"] = target
+                    if "ForeignKey" in field_type or "OneToOne" in field_type:
+                        fk_match = fk_target_pattern.match(field_args.strip())
+                        if fk_match:
+                            target = fk_match.group(1)
+                            relationships.append({"name": field_name, "target": target, "type": field_type})
+                            field_info["foreign_key"] = target
 
-                    m2m_match = m2m_pattern.search(field_args) if "ManyToMany" in field_type else None
-                    if m2m_match:
-                        target = m2m_match.group(1)
-                        relationships.append({"name": field_name, "target": target, "type": "ManyToManyField"})
+                    if "ManyToMany" in field_type:
+                        m2m_match = m2m_target_pattern.match(field_args.strip())
+                        if m2m_match:
+                            target = m2m_match.group(1)
+                            relationships.append({"name": field_name, "target": target, "type": "ManyToManyField"})
 
                     fields.append(field_info)
 
