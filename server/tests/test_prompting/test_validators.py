@@ -83,7 +83,9 @@ class TestValidatePracticeContent:
 
         DocumentService является основным сервисом для генерации документов.
         LLMClient используется для взаимодействия с языковыми моделями.
-        ContextPack содержит контекст для генерации.
+        ContextPack содержит контекст для генерации. SectionSpec определяет
+        параметры секции. DocumentArtifact хранит результаты генерации.
+        EditorService выполняет редактуру текста.
 
         **Алгоритм генерации:**
         1. Input: document_id, section_key
@@ -91,16 +93,21 @@ class TestValidatePracticeContent:
         3. Шаг: Формирование промпта
         4. Output: section_text
 
-        | Артефакт | Описание | Формат |
-        |----------|----------|--------|
-        | outline  | Оглавление | JSON   |
-        | section  | Секция    | Markdown |
+        | Артефакт | Описание | Формат | Статус |
+        |----------|----------|--------|--------|
+        | outline  | Оглавление | JSON   | OK |
+        | section  | Секция    | Markdown | OK |
+        | context_pack | Контекст | JSON | OK |
+        | document_draft | Черновик | MD | OK |
+        | quality_report | Отчёт | JSON | OK |
+        | literature | Литература | JSON | OK |
         """
         result = validate_practice_content(text)
         assert result.is_valid
-        assert result.entities_count >= 2
+        assert result.entities_count >= 4
         assert result.has_algorithm
         assert result.has_table
+        assert result.table_rows_total >= 6
         assert len(result.warnings) == 0
         assert result.score >= 0.9
 
@@ -138,6 +145,7 @@ class TestPracticeValidationResult:
             algorithm_markers=["**Алгоритм"],
             has_table=True,
             table_count=1,
+            table_rows_total=6,
             warnings=[],
             score=1.0
         )
@@ -146,6 +154,7 @@ class TestPracticeValidationResult:
         assert d["entities_count"] == 2
         assert d["has_algorithm"] == True
         assert d["has_table"] == True
+        assert d["table_rows_total"] == 6
         assert d["score"] == 1.0
 
 
@@ -183,8 +192,8 @@ class TestAssemblerPracticeGuardrails:
 
         spec = SectionSpec(key="implementation")
         prompt = _build_system_prompt(spec)
-        assert "ОБЯЗАТЕЛЬНЫЕ ТРЕБОВАНИЯ" in prompt
-        assert "КОНКРЕТНЫЕ СУЩНОСТИ" in prompt
+        assert "СТРОГИЕ ТРЕБОВАНИЯ" in prompt
+        assert "СУЩНОСТИ ИЗ FACTS" in prompt
         assert "АЛГОРИТМ" in prompt
         assert "ТАБЛИЦА" in prompt
 
@@ -194,7 +203,7 @@ class TestAssemblerPracticeGuardrails:
 
         spec = SectionSpec(key="intro")
         prompt = _build_system_prompt(spec)
-        assert "ОБЯЗАТЕЛЬНЫЕ ТРЕБОВАНИЯ ДЛЯ ПРАКТИЧЕСКОЙ ЧАСТИ" not in prompt
+        assert "СТРОГИЕ ТРЕБОВАНИЯ ДЛЯ ПРАКТИЧЕСКОЙ ЧАСТИ" not in prompt
 
     def test_is_practice_section_function(self):
         from services.prompting.assembler import _is_practice_section

@@ -22,6 +22,10 @@ ALGORITHM_PATTERNS = [
 ]
 
 TABLE_PATTERN = r'\|[^\n]+\|[\r\n]+\s*\|[\s\-:]+\|'
+TABLE_ROW_PATTERN = r'^\s*\|[^\n]+\|'
+
+MIN_TABLE_ROWS = 6
+MIN_ENTITIES = 4
 
 
 @dataclass
@@ -33,6 +37,7 @@ class PracticeValidationResult:
     algorithm_markers: list[str] = field(default_factory=list)
     has_table: bool = False
     table_count: int = 0
+    table_rows_total: int = 0
     warnings: list[str] = field(default_factory=list)
     score: float = 0.0
 
@@ -45,6 +50,7 @@ class PracticeValidationResult:
             "algorithm_markers": self.algorithm_markers,
             "has_table": self.has_table,
             "table_count": self.table_count,
+            "table_rows_total": self.table_rows_total,
             "warnings": self.warnings,
             "score": self.score,
         }
@@ -52,9 +58,10 @@ class PracticeValidationResult:
 
 def validate_practice_content(
     text: str,
-    min_entities: int = 2,
+    min_entities: int = MIN_ENTITIES,
     require_algorithm: bool = True,
-    require_table: bool = True
+    require_table: bool = True,
+    min_table_rows: int = MIN_TABLE_ROWS
 ) -> PracticeValidationResult:
     result = PracticeValidationResult()
 
@@ -88,22 +95,32 @@ def validate_practice_content(
     result.has_table = len(tables) > 0
     result.table_count = len(tables)
 
+    table_rows = re.findall(TABLE_ROW_PATTERN, text, re.MULTILINE)
+    separator_rows = len([r for r in table_rows if re.match(r'^\s*\|[\s\-:]+\|', r)])
+    result.table_rows_total = len(table_rows) - separator_rows
+
     if require_table and not result.has_table:
         result.warnings.append("Отсутствует markdown-таблица")
+    elif result.has_table and result.table_rows_total < min_table_rows:
+        result.warnings.append(
+            f"Недостаточно строк в таблицах: {result.table_rows_total} из {min_table_rows} требуемых"
+        )
 
     score = 0.0
     if result.entities_count >= min_entities:
-        score += 0.4
+        score += 0.35
     elif result.entities_count > 0:
         score += 0.2 * (result.entities_count / min_entities)
 
     if result.has_algorithm:
         score += 0.3
 
-    if result.has_table:
-        score += 0.3
+    if result.has_table and result.table_rows_total >= min_table_rows:
+        score += 0.35
+    elif result.has_table:
+        score += 0.15 * (result.table_rows_total / min_table_rows)
 
-    result.score = round(score, 2)
+    result.score = round(min(score, 1.0), 2)
     result.is_valid = len(result.warnings) == 0
 
     return result

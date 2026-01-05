@@ -368,12 +368,11 @@ def test_practice_section_has_academic_template():
     user_prompt = context_pack.rendered_prompt.user
 
     assert "PRACTICE SECTION TEMPLATE" in user_prompt
-    assert "ПОСТАНОВКА ЗАДАЧИ И ТРЕБОВАНИЯ" in user_prompt
-    assert "АРХИТЕКТУРА" in user_prompt
-    assert "МОДЕЛЬ ДАННЫХ" in user_prompt
-    assert "ПАЙПЛАЙН" in user_prompt
-    assert "API" in user_prompt
-    assert "ТЕСТИРОВАНИЕ И РЕЗУЛЬТАТЫ" in user_prompt
+    assert "ДИАГРАММА ПОТОКА ДАННЫХ" in user_prompt
+    assert "ТАБЛИЦА СУЩНОСТЕЙ" in user_prompt
+    assert "ТАБЛИЦА API ENDPOINTS" in user_prompt
+    assert "АЛГОРИТМ" in user_prompt
+    assert "РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ" in user_prompt
 
     assert "QUALITY RULES" in user_prompt
     assert "АНТИ-ВОДА" in user_prompt
