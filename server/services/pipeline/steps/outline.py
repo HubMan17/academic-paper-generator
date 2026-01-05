@@ -542,10 +542,16 @@ def ensure_outline_v2(
             outline_data = MOCK_OUTLINE_V2.copy()
             outline_data['work_type'] = work_type
             outline_data['title'] = topic_title
+
+            outline_data, filter_warnings = filter_outline_sections(outline_data, work_type)
+            if filter_warnings:
+                logger.info(f"Mock outline key filtering applied: {filter_warnings}")
+
             meta = {
                 "mock": True,
                 "profile": profile,
                 "work_type": work_type,
+                "filter_warnings": filter_warnings if filter_warnings else None,
             }
         else:
             facts = get_facts(document)
@@ -659,17 +665,17 @@ def build_outline_v2_from_preset(
     theory_sections = []
     practice_sections = []
 
-    for i in range(preset.theory_sections_count):
+    for i, (sec_key, sec_title, sec_words) in enumerate(preset.theory_sections):
         theory_sections.append({
             "key": f"theory_{i+1}",
-            "title": f"1.{i+1} Раздел теоретической части {i+1}",
+            "title": f"1.{i+1} {sec_title}",
             "points": []
         })
 
-    for i in range(preset.practice_sections_count):
+    for i, (sec_key, sec_title, sec_words) in enumerate(preset.practice_sections):
         practice_sections.append({
             "key": f"practice_{i+1}",
-            "title": f"2.{i+1} Раздел практической части {i+1}",
+            "title": f"2.{i+1} {sec_title}",
             "points": []
         })
 
