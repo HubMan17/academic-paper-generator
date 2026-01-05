@@ -181,12 +181,14 @@ OUTLINE_V2_USER_TEMPLATE = """## ИНФОРМАЦИЯ О ПРОЕКТЕ (facts.j
 ## ТРЕБОВАНИЯ К СТРУКТУРЕ
 2 основные главы (theory + practice):
 - Глава 1 (key="theory"): Теоретическая часть
-  - Минимум: 2 раздела
-  - Рекомендация: {theory_count} раздела
+  - МИНИМУМ: 2 раздела, МАКСИМУМ: 5 разделов
+  - ТЫ САМ ВЫБИРАЕШЬ оптимальное количество на основе темы и объёма
+  - Лучше 4-5 коротких чётких раздела, чем 2-3 длинных водянистых
   - Общий объём: ~{theory_words_budget} слов
 - Глава 2 (key="practice"): Практическая часть
-  - Минимум: 2 раздела
-  - Рекомендация: {practice_count} раздела
+  - МИНИМУМ: 2 раздела, МАКСИМУМ: 5 разделов
+  - ТЫ САМ ВЫБИРАЕШЬ оптимальное количество на основе темы и объёма
+  - Лучше 4-5 коротких чётких раздела, чем 2-3 длинных водянистых
   - Общий объём: ~{practice_words_budget} слов
 {subsections_note}
 
@@ -563,8 +565,6 @@ def ensure_outline_v2(
                 target_pages_max=target_pages_max,
                 language=document.language,
                 style_level=style_level,
-                theory_count=preset.theory_depth,
-                practice_count=preset.practice_depth,
                 theory_words_budget=preset.theory_words_budget,
                 practice_words_budget=preset.practice_words_budget,
                 subsections_note=subsections_note,
