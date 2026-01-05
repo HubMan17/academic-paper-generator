@@ -74,6 +74,28 @@ class SectionCoverage:
 
 
 @dataclass
+class PracticeBlockCheck:
+    block_name: str
+    present: bool
+    markers_found: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TerminologyIssue:
+    term: str
+    variants: list[str] = field(default_factory=list)
+    occurrences: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass
+class SuggestedFix:
+    priority: str  # high, medium, low
+    code: str
+    message: str
+    section_key: str | None = None
+
+
+@dataclass
 class QualityStats:
     total_words: int = 0
     total_chars: int = 0
@@ -87,6 +109,12 @@ class QualityStats:
     target_words_min: int = 0
     target_words_max: int = 0
     sections_coverage: list[SectionCoverage] = field(default_factory=list)
+    repetition_score: float = 0.0
+    section_repetition_scores: dict[str, float] = field(default_factory=dict)
+    section_length_warnings: list[str] = field(default_factory=list)
+    missing_required_blocks: list[PracticeBlockCheck] = field(default_factory=list)
+    terminology_inconsistencies: list[TerminologyIssue] = field(default_factory=list)
+    suggested_fixes: list[SuggestedFix] = field(default_factory=list)
 
 
 @dataclass
@@ -206,6 +234,34 @@ def quality_report_to_dict(report: QualityReport) -> dict:
                     "status": sc.status,
                 }
                 for sc in report.stats.sections_coverage
+            ],
+            "repetition_score": report.stats.repetition_score,
+            "section_repetition_scores": report.stats.section_repetition_scores,
+            "section_length_warnings": report.stats.section_length_warnings,
+            "missing_required_blocks": [
+                {
+                    "block_name": b.block_name,
+                    "present": b.present,
+                    "markers_found": b.markers_found,
+                }
+                for b in report.stats.missing_required_blocks
+            ],
+            "terminology_inconsistencies": [
+                {
+                    "term": t.term,
+                    "variants": t.variants,
+                    "occurrences": t.occurrences,
+                }
+                for t in report.stats.terminology_inconsistencies
+            ],
+            "suggested_fixes": [
+                {
+                    "priority": f.priority,
+                    "code": f.code,
+                    "message": f.message,
+                    "section_key": f.section_key,
+                }
+                for f in report.stats.suggested_fixes
             ],
         },
         "generated_at": report.generated_at.isoformat() if report.generated_at else None,

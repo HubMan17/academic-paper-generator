@@ -10,11 +10,28 @@ from services.pipeline.ensure import ensure_artifact, get_success_artifact, get_
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.schemas import (
     QualityReport, QualityStats, SectionCoverage,
+    PracticeBlockCheck, TerminologyIssue, SuggestedFix,
     quality_report_to_dict,
 )
 from services.pipeline.specs import get_section_spec
 
 logger = logging.getLogger(__name__)
+
+PRACTICE_REQUIRED_BLOCKS = [
+    ("requirements", ["требовани", "задач", "постановка", "цел"]),
+    ("architecture", ["архитектур", "структур", "компонент", "модул"]),
+    ("data", ["данн", "модел", "сущност", "таблиц", "схем"]),
+    ("api", ["api", "endpoint", "интерфейс", "метод", "запрос"]),
+    ("testing", ["тест", "проверк", "валидац", "результат"]),
+]
+
+TERMINOLOGY_GROUPS = [
+    ("api", ["API", "АПИ", "интерфейс программирования"]),
+    ("endpoint", ["endpoint", "эндпоинт", "точка доступа", "маршрут"]),
+    ("database", ["база данных", "БД", "СУБД", "хранилище"]),
+    ("frontend", ["frontend", "фронтенд", "клиентская часть", "интерфейс пользователя"]),
+    ("backend", ["backend", "бэкенд", "серверная часть"]),
+]
 
 
 def count_words(text: str) -> int:
@@ -38,6 +55,100 @@ def check_ngram_repetition(text: str, threshold: float = 0.1) -> tuple[bool, flo
     ratio = repeated / len(counter) if counter else 0.0
 
     return ratio > threshold, round(ratio, 3)
+
+
+def check_practice_blocks(text: str) -> list[PracticeBlockCheck]:
+    text_lower = text.lower()
+    results = []
+
+    for block_name, markers in PRACTICE_REQUIRED_BLOCKS:
+        found_markers = []
+        for marker in markers:
+            if marker.lower() in text_lower:
+                found_markers.append(marker)
+
+        results.append(PracticeBlockCheck(
+            block_name=block_name,
+            present=len(found_markers) > 0,
+            markers_found=found_markers
+        ))
+
+    return results
+
+
+def check_terminology_consistency(all_text: str) -> list[TerminologyIssue]:
+    issues = []
+
+    for term, variants in TERMINOLOGY_GROUPS:
+        occurrences = {}
+        for variant in variants:
+            count = len(re.findall(re.escape(variant), all_text, re.IGNORECASE))
+            if count > 0:
+                occurrences[variant] = count
+
+        if len(occurrences) > 1:
+            issues.append(TerminologyIssue(
+                term=term,
+                variants=list(occurrences.keys()),
+                occurrences=occurrences
+            ))
+
+    return issues
+
+
+def generate_suggested_fixes(report: QualityReport) -> list[SuggestedFix]:
+    fixes = []
+
+    for error in report.errors:
+        if error.code == "MISSING_SECTION":
+            fixes.append(SuggestedFix(
+                priority="high",
+                code="ADD_SECTION",
+                message=f"Добавить секцию '{error.section_key}'",
+                section_key=error.section_key
+            ))
+        elif error.code == "EMPTY_SECTION":
+            fixes.append(SuggestedFix(
+                priority="high",
+                code="FILL_SECTION",
+                message=f"Заполнить пустую секцию '{error.section_key}'",
+                section_key=error.section_key
+            ))
+
+    for warning in report.warnings:
+        if warning.code == "SECTION_TOO_SHORT":
+            fixes.append(SuggestedFix(
+                priority="medium",
+                code="EXPAND_SECTION",
+                message=f"Расширить секцию '{warning.section_key}' до минимального объёма",
+                section_key=warning.section_key
+            ))
+        elif warning.code == "HIGH_REPETITION":
+            fixes.append(SuggestedFix(
+                priority="medium",
+                code="REDUCE_REPETITION",
+                message=f"Снизить повторяемость в секции '{warning.section_key}'",
+                section_key=warning.section_key
+            ))
+
+    for block in report.stats.missing_required_blocks:
+        if not block.present:
+            fixes.append(SuggestedFix(
+                priority="medium",
+                code="ADD_PRACTICE_BLOCK",
+                message=f"Добавить блок '{block.block_name}' в практическую часть",
+                section_key=None
+            ))
+
+    for term_issue in report.stats.terminology_inconsistencies:
+        fixes.append(SuggestedFix(
+            priority="low",
+            code="UNIFY_TERMINOLOGY",
+            message=f"Унифицировать терминологию: {term_issue.term} (варианты: {', '.join(term_issue.variants)})",
+            section_key=None
+        ))
+
+    return fixes
 
 
 def ensure_quality_report(
@@ -74,6 +185,10 @@ def ensure_quality_report(
         target_words_min = 0
         target_words_max = 0
         sections_coverage = []
+
+        section_repetition_scores = {}
+        section_length_warnings = []
+        all_practice_text = ""
 
         for db_section in db_sections:
             key = db_section.key
@@ -166,6 +281,7 @@ def ensure_quality_report(
             seen_titles.add(section_title)
 
             is_repetitive, ratio = check_ngram_repetition(content)
+            section_repetition_scores[key] = ratio
             if is_repetitive:
                 report.add_warning(
                     "HIGH_REPETITION",
@@ -173,6 +289,15 @@ def ensure_quality_report(
                     section_key=key,
                     repetition_ratio=ratio
                 )
+
+            if section_status == "short":
+                section_length_warnings.append(f"{key}: слишком короткий ({words} слов, мин. {min_words})")
+            elif section_status == "long":
+                section_length_warnings.append(f"{key}: слишком длинный ({words} слов, макс. {max_words})")
+
+            is_practice = key.startswith("practice") or "implementation" in key or "testing" in key
+            if is_practice:
+                all_practice_text += content + "\n"
 
         coverage_percent = round(required_present / required_total * 100, 1) if required_total > 0 else 100.0
 
@@ -183,6 +308,30 @@ def ensure_quality_report(
                 actual=total_words,
                 expected_min=target_words_min
             )
+
+        avg_repetition = (
+            sum(section_repetition_scores.values()) / len(section_repetition_scores)
+            if section_repetition_scores else 0.0
+        )
+
+        practice_blocks = check_practice_blocks(all_practice_text) if all_practice_text else []
+        missing_blocks = [b for b in practice_blocks if not b.present]
+
+        for block in missing_blocks:
+            report.add_warning(
+                "MISSING_PRACTICE_BLOCK",
+                f"Practice section missing '{block.block_name}' block",
+                section_key=None,
+                block_name=block.block_name
+            )
+
+        all_text = ""
+        for db_section in db_sections:
+            section_artifact = get_success_artifact(document_id, ArtifactKind.section(db_section.key))
+            if section_artifact and section_artifact.content_text:
+                all_text += section_artifact.content_text + "\n"
+
+        terminology_issues = check_terminology_consistency(all_text)
 
         report.stats = QualityStats(
             total_words=total_words,
@@ -197,7 +346,15 @@ def ensure_quality_report(
             target_words_min=target_words_min,
             target_words_max=target_words_max,
             sections_coverage=sections_coverage,
+            repetition_score=round(avg_repetition, 3),
+            section_repetition_scores=section_repetition_scores,
+            section_length_warnings=section_length_warnings,
+            missing_required_blocks=practice_blocks,
+            terminology_inconsistencies=terminology_issues,
         )
+
+        suggested_fixes = generate_suggested_fixes(report)
+        report.stats.suggested_fixes = suggested_fixes
 
         return {
             "data_json": quality_report_to_dict(report),
