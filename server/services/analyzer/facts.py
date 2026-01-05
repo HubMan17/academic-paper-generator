@@ -4,7 +4,10 @@ from typing import Any
 
 from .constants import FACTS_SCHEMA
 from .detectors import detect_languages, detect_frameworks, detect_dependencies, detect_architecture_type
-from .extractors import extract_fastapi_routes, extract_orm_models, extract_frontend_routes, extract_deep_modules
+from .extractors import (
+    extract_fastapi_routes, extract_orm_models, extract_frontend_routes, extract_deep_modules,
+    extract_django_models, extract_drf_endpoints, extract_pipeline_steps, extract_artifact_kinds
+)
 from .utils import find_files_recursive, rel_path
 
 
@@ -56,10 +59,58 @@ def generate_facts_json(repo_path: Path, repo_url: str, commit_sha: str) -> dict
     frameworks = detect_frameworks(repo_path)
     architecture = detect_architecture_type(repo_path)
     modules = extract_deep_modules(repo_path)
-    endpoints = extract_fastapi_routes(repo_path)
+    fastapi_endpoints = extract_fastapi_routes(repo_path)
+    drf_endpoints = extract_drf_endpoints(repo_path)
     frontend_routes = extract_frontend_routes(repo_path)
     orm_models = extract_orm_models(repo_path)
+    django_models = extract_django_models(repo_path)
+    pipeline_steps = extract_pipeline_steps(repo_path)
+    artifact_kinds = extract_artifact_kinds(repo_path)
     dependencies = detect_dependencies(repo_path)
+
+    all_endpoints = []
+    for ep in fastapi_endpoints:
+        all_endpoints.append({
+            "method": ep.method,
+            "path": ep.full_path,
+            "handler": ep.handler,
+            "file": ep.file,
+            "framework": "FastAPI",
+            "auth_required": ep.auth_required,
+            "description": ep.description
+        })
+    for ep in drf_endpoints:
+        all_endpoints.append({
+            "method": ep.method,
+            "path": ep.path,
+            "handler": f"{ep.viewset}.{ep.action}",
+            "file": ep.file,
+            "framework": "DRF",
+            "serializer": ep.serializer,
+            "permissions": ep.permission_classes,
+            "description": ep.description
+        })
+
+    all_models = []
+    for model in orm_models:
+        all_models.append({
+            "name": model.name,
+            "table": model.table,
+            "fields": model.fields,
+            "relationships": model.relationships,
+            "file": model.file,
+            "framework": "SQLAlchemy"
+        })
+    for model in django_models:
+        all_models.append({
+            "name": model.name,
+            "app": model.app,
+            "fields": model.fields,
+            "relationships": model.relationships,
+            "file": model.file,
+            "framework": "Django",
+            "meta": model.meta
+        })
 
     return {
         "schema": FACTS_SCHEMA,
@@ -97,21 +148,8 @@ def generate_facts_json(repo_path: Path, repo_url: str, commit_sha: str) -> dict
             for mod in modules
         ],
         "api": {
-            "endpoints": [
-                {
-                    "method": ep.method,
-                    "path": ep.path,
-                    "full_path": ep.full_path,
-                    "handler": ep.handler,
-                    "router": ep.router,
-                    "file": ep.file,
-                    "tags": ep.tags,
-                    "auth_required": ep.auth_required,
-                    "description": ep.description
-                }
-                for ep in endpoints
-            ],
-            "total_count": len(endpoints)
+            "endpoints": all_endpoints,
+            "total_count": len(all_endpoints)
         },
         "frontend_routes": [
             {
@@ -123,16 +161,19 @@ def generate_facts_json(repo_path: Path, repo_url: str, commit_sha: str) -> dict
             }
             for route in frontend_routes
         ],
-        "models": [
-            {
-                "name": model.name,
-                "table": model.table,
-                "fields": model.fields,
-                "relationships": model.relationships,
-                "file": model.file
-            }
-            for model in orm_models
-        ],
+        "models": all_models,
+        "pipeline": {
+            "steps": [
+                {
+                    "name": step.name,
+                    "kind": step.kind,
+                    "file": step.file,
+                    "description": step.description
+                }
+                for step in pipeline_steps
+            ],
+            "artifact_kinds": artifact_kinds
+        },
         "runtime": {
             "dependencies": [
                 {

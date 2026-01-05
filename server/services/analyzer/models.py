@@ -74,3 +74,35 @@ class Dependency:
     name: str
     version: str
     evidence: list[Evidence] = field(default_factory=list)
+
+
+@dataclass
+class DjangoModel:
+    name: str
+    app: str
+    fields: list[dict]
+    file: str
+    meta: dict = field(default_factory=dict)
+    relationships: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class DRFEndpoint:
+    method: str
+    path: str
+    viewset: str
+    action: str
+    file: str
+    serializer: str = ""
+    permission_classes: list[str] = field(default_factory=list)
+    description: str = ""
+
+
+@dataclass
+class PipelineStep:
+    name: str
+    kind: str
+    file: str
+    description: str = ""
+    inputs: list[str] = field(default_factory=list)
+    outputs: list[str] = field(default_factory=list)

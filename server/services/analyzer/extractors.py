@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from .constants import SKIP_DIRS, DEEP_ROLE_MAPPING
-from .models import APIEndpoint, ORMModel, FrontendRoute, Module, Feature, Evidence
+from .models import APIEndpoint, ORMModel, FrontendRoute, Module, Feature, Evidence, DjangoModel, DRFEndpoint, PipelineStep
 from .parsers import extract_column_type
 from .utils import rel_path
 
@@ -435,3 +435,361 @@ def extract_features(repo_path: Path, endpoints: list[APIEndpoint]) -> list[Feat
         ))
 
     return features
+
+
+def extract_django_models(repo_path: Path) -> list[DjangoModel]:
+    if not repo_path:
+        return []
+
+    models = []
+    skip_classes = {"Model", "AbstractUser", "AbstractBaseUser", "PermissionsMixin"}
+
+    model_class_pattern = re.compile(
+        r'class\s+(\w+)\s*\((?:[^)]*(?:models\.Model|AbstractUser|AbstractBaseUser)[^)]*)\)\s*:'
+    )
+    field_pattern = re.compile(
+        r'^\s+(\w+)\s*=\s*models\.(\w+)\s*\(([^)]*)\)',
+        re.MULTILINE
+    )
+    fk_target_pattern = re.compile(
+        r'^["\']?(\w+)["\']?'
+    )
+    m2m_target_pattern = re.compile(
+        r'^["\']?(\w+)["\']?'
+    )
+    choices_pattern = re.compile(
+        r'class\s+(\w+)\s*\([^)]*(?:TextChoices|IntegerChoices|Choices)[^)]*\)'
+    )
+
+    for root, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+
+        for file in files:
+            if file != "models.py":
+                continue
+
+            file_path = Path(root) / file
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+
+            if "models.Model" not in content and "AbstractUser" not in content:
+                continue
+
+            rel_path_str = rel_path(file_path, repo_path)
+            app_name = Path(root).name
+
+            class_matches = list(model_class_pattern.finditer(content))
+            for i, match in enumerate(class_matches):
+                class_name = match.group(1)
+
+                if class_name in skip_classes:
+                    continue
+
+                start = match.end()
+                end = class_matches[i + 1].start() if i + 1 < len(class_matches) else len(content)
+                class_body = content[start:end]
+
+                fields = []
+                relationships = []
+
+                for field_match in field_pattern.finditer(class_body):
+                    field_name = field_match.group(1)
+                    field_type = field_match.group(2)
+                    field_args = field_match.group(3)
+
+                    if field_name.startswith('_'):
+                        continue
+
+                    field_info = {"name": field_name, "type": field_type}
+
+                    if "ForeignKey" in field_type or "OneToOne" in field_type:
+                        fk_match = fk_target_pattern.match(field_args.strip())
+                        if fk_match:
+                            target = fk_match.group(1)
+                            relationships.append({"name": field_name, "target": target, "type": field_type})
+                            field_info["foreign_key"] = target
+
+                    if "ManyToMany" in field_type:
+                        m2m_match = m2m_target_pattern.match(field_args.strip())
+                        if m2m_match:
+                            target = m2m_match.group(1)
+                            relationships.append({"name": field_name, "target": target, "type": "ManyToManyField"})
+
+                    fields.append(field_info)
+
+                choices = []
+                for choice_match in choices_pattern.finditer(class_body):
+                    choices.append(choice_match.group(1))
+
+                meta = {}
+                if choices:
+                    meta["choices"] = choices
+
+                models.append(DjangoModel(
+                    name=class_name,
+                    app=app_name,
+                    fields=fields,
+                    file=rel_path_str,
+                    meta=meta,
+                    relationships=relationships
+                ))
+
+    return models
+
+
+def extract_drf_endpoints(repo_path: Path) -> list[DRFEndpoint]:
+    if not repo_path:
+        return []
+
+    endpoints = []
+
+    viewset_pattern = re.compile(
+        r'class\s+(\w+)\s*\([^)]*(?:ViewSet|ModelViewSet|GenericViewSet|APIView)[^)]*\)'
+    )
+    serializer_pattern = re.compile(
+        r'serializer_class\s*=\s*(\w+)'
+    )
+    permission_pattern = re.compile(
+        r'permission_classes\s*=\s*\[([^\]]+)\]'
+    )
+    action_pattern = re.compile(
+        r'@action\s*\([^)]*detail\s*=\s*(True|False)[^)]*(?:methods\s*=\s*\[([^\]]+)\])?[^)]*(?:url_path\s*=\s*["\']([^"\']+)["\'])?[^)]*\)\s*\n\s*def\s+(\w+)'
+    )
+
+    router_pattern = re.compile(
+        r'router\.register\s*\(\s*[r]?["\']([^"\']+)["\']?\s*,\s*(\w+)'
+    )
+    path_pattern = re.compile(
+        r'path\s*\(\s*["\']([^"\']+)["\']?\s*,\s*(\w+)\.as_view\(\)'
+    )
+    api_view_pattern = re.compile(
+        r'@api_view\s*\(\s*\[([^\]]+)\]\s*\)\s*\ndef\s+(\w+)',
+        re.MULTILINE
+    )
+    extend_schema_tags_pattern = re.compile(
+        r'@extend_schema\s*\([^)]*tags\s*=\s*\["([^"]+)"\]'
+    )
+    path_to_view_pattern = re.compile(
+        r'path\s*\(\s*["\']([^"\']+)["\']?\s*,\s*(\w+)\s*,'
+    )
+
+    view_to_path = {}
+    viewset_to_prefix = {}
+
+    for root, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+
+        for file in files:
+            if file != "urls.py":
+                continue
+
+            file_path = Path(root) / file
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+
+            for match in router_pattern.finditer(content):
+                prefix = match.group(1)
+                viewset_name = match.group(2)
+                viewset_to_prefix[viewset_name] = prefix
+
+            for match in path_pattern.finditer(content):
+                path = match.group(1)
+                view_name = match.group(2)
+                viewset_to_prefix[view_name] = path
+
+            for match in path_to_view_pattern.finditer(content):
+                url_path = match.group(1)
+                view_name = match.group(2)
+                view_to_path[view_name] = url_path
+
+    for root, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+
+        for file in files:
+            if file not in ["views.py", "viewsets.py"] and not file.endswith("_views.py"):
+                continue
+
+            file_path = Path(root) / file
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+
+            rel_path_str = rel_path(file_path, repo_path)
+
+            for match in api_view_pattern.finditer(content):
+                methods_str = match.group(1)
+                func_name = match.group(2)
+                methods = [m.strip().strip('"\'').upper() for m in methods_str.split(',')]
+
+                url_path = view_to_path.get(func_name, func_name.replace('_', '/'))
+
+                tag = ""
+                search_start = max(0, match.start() - 500)
+                search_area = content[search_start:match.start()]
+                tag_match = extend_schema_tags_pattern.search(search_area)
+                if tag_match:
+                    tag = tag_match.group(1)
+
+                for method in methods:
+                    endpoints.append(DRFEndpoint(
+                        method=method,
+                        path=f"/api/v1/{url_path}",
+                        viewset=tag or "api",
+                        action=func_name,
+                        file=rel_path_str,
+                        serializer="",
+                        permission_classes=[]
+                    ))
+
+            if "ViewSet" not in content and "APIView" not in content:
+                continue
+
+            class_matches = list(viewset_pattern.finditer(content))
+            for i, match in enumerate(class_matches):
+                viewset_name = match.group(1)
+
+                start = match.end()
+                end = class_matches[i + 1].start() if i + 1 < len(class_matches) else len(content)
+                class_body = content[start:end]
+
+                serializer = ""
+                serializer_match = serializer_pattern.search(class_body)
+                if serializer_match:
+                    serializer = serializer_match.group(1)
+
+                permissions = []
+                perm_match = permission_pattern.search(class_body)
+                if perm_match:
+                    perms = perm_match.group(1)
+                    permissions = [p.strip() for p in perms.split(',') if p.strip()]
+
+                prefix = viewset_to_prefix.get(viewset_name, viewset_name.lower().replace("viewset", ""))
+
+                if "ModelViewSet" in content[match.start():match.end()+100]:
+                    for method, action in [("GET", "list"), ("POST", "create"), ("GET", "retrieve"), ("PUT", "update"), ("PATCH", "partial_update"), ("DELETE", "destroy")]:
+                        path = f"/api/v1/{prefix}/" if action in ["list", "create"] else f"/api/v1/{prefix}/{{id}}/"
+                        endpoints.append(DRFEndpoint(
+                            method=method,
+                            path=path,
+                            viewset=viewset_name,
+                            action=action,
+                            file=rel_path_str,
+                            serializer=serializer,
+                            permission_classes=permissions
+                        ))
+
+                for action_match in action_pattern.finditer(class_body):
+                    detail = action_match.group(1) == "True"
+                    methods_str = action_match.group(2) or '"get"'
+                    url_path = action_match.group(3) or action_match.group(4)
+                    action_name = action_match.group(4)
+
+                    methods = [m.strip().strip('"\'').upper() for m in methods_str.split(',')]
+
+                    for method in methods:
+                        if detail:
+                            path = f"/api/v1/{prefix}/{{id}}/{url_path}/"
+                        else:
+                            path = f"/api/v1/{prefix}/{url_path}/"
+
+                        endpoints.append(DRFEndpoint(
+                            method=method,
+                            path=path,
+                            viewset=viewset_name,
+                            action=action_name,
+                            file=rel_path_str,
+                            serializer=serializer,
+                            permission_classes=permissions
+                        ))
+
+    return endpoints
+
+
+def extract_pipeline_steps(repo_path: Path) -> list[PipelineStep]:
+    if not repo_path:
+        return []
+
+    steps = []
+
+    ensure_pattern = re.compile(
+        r'def\s+(ensure_\w+)\s*\(\s*\n?\s*document_id'
+    )
+    kind_pattern = re.compile(
+        r'kind\s*=\s*(?:ArtifactKind\.)?(\w+)(?:\.value)?'
+    )
+    docstring_pattern = re.compile(
+        r'"""([^"]+)"""'
+    )
+
+    steps_dir = repo_path / "server" / "services" / "pipeline" / "steps"
+    if not steps_dir.exists():
+        pipeline_dir = repo_path / "services" / "pipeline" / "steps"
+        if pipeline_dir.exists():
+            steps_dir = pipeline_dir
+        else:
+            return []
+
+    for file_path in steps_dir.glob("*.py"):
+        if file_path.name.startswith("_"):
+            continue
+
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+
+        rel_path_str = rel_path(file_path, repo_path)
+
+        for match in ensure_pattern.finditer(content):
+            func_name = match.group(1)
+            start = match.start()
+
+            kind = ""
+            kind_search_area = content[start:start+500]
+            kind_match = kind_pattern.search(kind_search_area)
+            if kind_match:
+                kind = kind_match.group(1)
+
+            description = ""
+            doc_match = docstring_pattern.search(kind_search_area)
+            if doc_match:
+                description = doc_match.group(1).strip()[:100]
+
+            steps.append(PipelineStep(
+                name=func_name,
+                kind=kind,
+                file=rel_path_str,
+                description=description
+            ))
+
+    return steps
+
+
+def extract_artifact_kinds(repo_path: Path) -> list[dict]:
+    kinds = []
+
+    kinds_file = repo_path / "server" / "services" / "pipeline" / "kinds.py"
+    if not kinds_file.exists():
+        kinds_file = repo_path / "services" / "pipeline" / "kinds.py"
+        if not kinds_file.exists():
+            return []
+
+    try:
+        content = kinds_file.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return []
+
+    kind_pattern = re.compile(r'(\w+)\s*=\s*["\']([^"\']+)["\']')
+
+    for match in kind_pattern.finditer(content):
+        name = match.group(1)
+        value = match.group(2)
+        if name.isupper():
+            kinds.append({"name": name, "value": value})
+
+    return kinds
