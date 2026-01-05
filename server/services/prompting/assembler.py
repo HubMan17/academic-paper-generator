@@ -3,6 +3,75 @@ from typing import Any
 from .schema import SectionSpec, ContextLayer, RenderedPrompt, OutlineMode
 
 
+PRACTICE_SECTION_KEYS = {
+    'practice', 'analysis', 'architecture', 'implementation', 'testing', 'design', 'development'
+}
+
+PRACTICE_ACADEMIC_TEMPLATE = """
+## ОБЯЗАТЕЛЬНАЯ СТРУКТУРА ПРАКТИЧЕСКОЙ СЕКЦИИ
+
+Следуй этой структуре для практической части:
+
+1. ПОСТАНОВКА ЗАДАЧИ И ТРЕБОВАНИЯ
+   - Чётко сформулируй решаемую задачу
+   - Перечисли функциональные требования (FR) списком
+   - Перечисли нефункциональные требования (NFR)
+
+2. АРХИТЕКТУРА (компоненты и взаимодействия)
+   - Опиши основные модули/компоненты системы
+   - Покажи связи между компонентами
+   - Объясни выбор архитектурного паттерна
+
+3. МОДЕЛЬ ДАННЫХ / АРТЕФАКТЫ
+   - Опиши ключевые сущности и их атрибуты
+   - Покажи связи между сущностями
+   - Укажи форматы данных (JSON, etc.)
+
+4. ПАЙПЛАЙН / АЛГОРИТМ
+   - Опиши последовательность шагов обработки
+   - Приведи псевдокод или блок-схему ключевых алгоритмов
+   - Объясни логику принятия решений
+
+5. API / ИНТЕРФЕЙСЫ
+   - Перечисли ключевые endpoints/методы
+   - Опиши входные и выходные параметры
+   - Приведи примеры запросов/ответов
+
+6. ТЕСТИРОВАНИЕ И РЕЗУЛЬТАТЫ
+   - Опиши стратегию тестирования
+   - Приведи конкретные метрики (до/после, если применимо)
+   - Покажи результаты валидации
+"""
+
+ANTI_WATER_RULES = """
+## АНТИ-ВОДА ПРАВИЛА (СТРОГО СОБЛЮДАТЬ)
+
+ЗАПРЕЩЕНО:
+- Общие фразы без конкретики ("система позволяет", "обеспечивает гибкость")
+- Обзорные абзацы без технических деталей
+- Повторение одной мысли разными словами
+- Пустые вводные предложения
+- Банальности ("в современном мире", "с развитием технологий")
+
+ОБЯЗАТЕЛЬНО:
+- Каждый абзац содержит конкретные факты из FACTS
+- Называть конкретные технологии, модули, методы
+- Приводить примеры (псевдокод, структуры данных, endpoints)
+- Использовать числа и метрики где возможно
+- Минимум 70% текста — конкретика из анализа проекта
+"""
+
+
+def _is_practice_section(spec: SectionSpec) -> bool:
+    if spec.chapter_key == 'practice':
+        return True
+    if spec.key.startswith('practice_'):
+        return True
+    if spec.key in PRACTICE_SECTION_KEYS:
+        return True
+    return False
+
+
 def assemble_context(
     spec: SectionSpec,
     selected_facts: list[dict[str, Any]],
@@ -64,6 +133,10 @@ def _build_user_prompt(spec: SectionSpec, layers: ContextLayer) -> str:
 
     if layers.outline_points:
         sections.append(f"# OUTLINE POINTS FOR THIS SECTION\n{layers.outline_points}\n\nОБЯЗАТЕЛЬНО покрой каждый из перечисленных пунктов в тексте секции.")
+
+    if _is_practice_section(spec):
+        sections.append(f"# PRACTICE SECTION TEMPLATE{PRACTICE_ACADEMIC_TEMPLATE}")
+        sections.append(f"# QUALITY RULES{ANTI_WATER_RULES}")
 
     if layers.facts_slice:
         sections.append(f"# FACTS\n{layers.facts_slice}")

@@ -43,6 +43,7 @@ class PipelineSectionSpec:
             style_profile=self.style_profile,
             target_chars=(min_chars, max_chars),
             constraints=self.constraints,
+            chapter_key=self.chapter_key,
         )
 
 
@@ -263,13 +264,16 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
 
     prev_key = "intro"
     theory_base_order = order
-    for i, (key, title, target_words) in enumerate(preset.theory_sections):
-        full_key = f"theory_{key}"
-        fact_tags = THEORY_SECTION_TAGS.get(key, ['tech_stack', 'frameworks'])
+    theory_tag_keys = list(THEORY_SECTION_TAGS.keys())
+    for i in range(preset.theory_sections_count):
+        full_key = f"theory_{i+1}"
+        tag_key = theory_tag_keys[i % len(theory_tag_keys)] if theory_tag_keys else 'concepts'
+        fact_tags = THEORY_SECTION_TAGS.get(tag_key, ['tech_stack', 'frameworks'])
+        target_words = preset.get_section_target_words('theory', i)
         word_range = (max(400, target_words - 200), target_words + 200)
         sections.append(PipelineSectionSpec(
             key=full_key,
-            title=f"1.{i+1} {title}",
+            title=f"1.{i+1} Раздел теории",
             order=order,
             chapter_key="theory",
             depth=1,
@@ -285,13 +289,17 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
         order += 1
 
     practice_base_order = order
-    for i, (key, title, target_words) in enumerate(preset.practice_sections):
-        full_key = f"practice_{key}"
-        fact_tags = PRACTICE_SECTION_TAGS.get(key, ['modules', 'models'])
+    practice_tag_keys = list(PRACTICE_SECTION_TAGS.keys())
+    for i in range(preset.practice_sections_count):
+        full_key = f"practice_{i+1}"
+        tag_key = practice_tag_keys[i % len(practice_tag_keys)] if practice_tag_keys else 'analysis'
+        fact_tags = PRACTICE_SECTION_TAGS.get(tag_key, ['modules', 'models'])
+        target_words = preset.get_section_target_words('practice', i)
         word_range = (max(400, target_words - 200), target_words + 200)
+        is_impl_or_test = i >= (preset.practice_sections_count - 2)
         sections.append(PipelineSectionSpec(
             key=full_key,
-            title=f"2.{i+1} {title}",
+            title=f"2.{i+1} Раздел практики",
             order=order,
             chapter_key="practice",
             depth=1,
@@ -299,7 +307,7 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
             depends_on=[prev_key],
             target_words=word_range,
             fact_tags=fact_tags,
-            outline_mode=OutlineMode.LOCAL if key in ['implementation', 'testing'] else OutlineMode.STRUCTURE,
+            outline_mode=OutlineMode.LOCAL if is_impl_or_test else OutlineMode.STRUCTURE,
             needs_summaries=True,
             constraints=["Описать практическую реализацию"],
         ))

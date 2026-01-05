@@ -344,3 +344,81 @@ def test_outline_points_empty_when_no_points():
 
     assert context_pack.layers.outline_points == ""
     assert "OUTLINE POINTS FOR THIS SECTION" not in context_pack.rendered_prompt.user
+
+
+def test_practice_section_has_academic_template():
+    practice_spec = SectionSpec(
+        key="practice_1",
+        fact_tags=["modules", "models"],
+        chapter_key="practice",
+    )
+
+    outline = {"title": "Test", "sections": []}
+    facts = {"facts": []}
+
+    context_pack = slice_for_section(
+        section_key="practice_1",
+        facts=facts,
+        outline=outline,
+        summaries=[],
+        global_context="Test",
+        spec=practice_spec
+    )
+
+    user_prompt = context_pack.rendered_prompt.user
+
+    assert "PRACTICE SECTION TEMPLATE" in user_prompt
+    assert "ПОСТАНОВКА ЗАДАЧИ И ТРЕБОВАНИЯ" in user_prompt
+    assert "АРХИТЕКТУРА" in user_prompt
+    assert "МОДЕЛЬ ДАННЫХ" in user_prompt
+    assert "ПАЙПЛАЙН" in user_prompt
+    assert "API" in user_prompt
+    assert "ТЕСТИРОВАНИЕ И РЕЗУЛЬТАТЫ" in user_prompt
+
+    assert "QUALITY RULES" in user_prompt
+    assert "АНТИ-ВОДА" in user_prompt
+    assert "ЗАПРЕЩЕНО" in user_prompt
+    assert "ОБЯЗАТЕЛЬНО" in user_prompt
+
+
+def test_non_practice_section_no_academic_template():
+    intro_spec = SectionSpec(
+        key="intro",
+        fact_tags=["project_name"],
+        chapter_key="intro",
+    )
+
+    outline = {"title": "Test", "sections": []}
+    facts = {"facts": []}
+
+    context_pack = slice_for_section(
+        section_key="intro",
+        facts=facts,
+        outline=outline,
+        summaries=[],
+        global_context="Test",
+        spec=intro_spec
+    )
+
+    user_prompt = context_pack.rendered_prompt.user
+
+    assert "PRACTICE SECTION TEMPLATE" not in user_prompt
+    assert "АНТИ-ВОДА" not in user_prompt
+
+
+def test_practice_by_key_pattern():
+    for key in ["practice_1", "practice_2", "analysis", "implementation", "testing"]:
+        spec = SectionSpec(key=key, chapter_key="practice")
+        outline = {"title": "Test", "sections": []}
+        facts = {"facts": []}
+
+        context_pack = slice_for_section(
+            section_key=key,
+            facts=facts,
+            outline=outline,
+            summaries=[],
+            global_context="Test",
+            spec=spec
+        )
+
+        assert "PRACTICE SECTION TEMPLATE" in context_pack.rendered_prompt.user, f"Failed for key: {key}"

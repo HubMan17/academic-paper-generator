@@ -66,3 +66,4 @@ class SectionSpec:
     style_profile: str = "academic"
     target_chars: tuple[int, int] = (3000, 6000)
     constraints: list[str] = field(default_factory=list)
+    chapter_key: str = ""
