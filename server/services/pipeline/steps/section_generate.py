@@ -13,6 +13,7 @@ from services.pipeline.kinds import ArtifactKind
 from services.pipeline.profiles import get_profile
 from services.pipeline.specs import get_section_spec
 from services.prompting.schema import SectionOutputReport, SECTION_OUTPUT_SCHEMA
+from services.prompting import validate_practice_content, is_practice_section
 
 from services.pipeline.mocks import MOCK_SECTION_TEXT
 
@@ -171,7 +172,20 @@ def ensure_section(
         else:
             sources_used = context_pack_artifact.data_json.get("selected_facts", {}).get("keys", [])
 
+        practice_validation = None
+        if is_practice_section(section_key):
+            validation_result = validate_practice_content(content_text)
+            practice_validation = validation_result.to_dict()
+
+            if not validation_result.is_valid:
+                logger.warning(
+                    f"Practice section {section_key} validation warnings: {validation_result.warnings}"
+                )
+
         if llm_trace_data:
+            if practice_validation:
+                llm_trace_data["practice_validation"] = practice_validation
+
             DocumentArtifact.objects.create(
                 document=document,
                 section=section,
@@ -184,15 +198,20 @@ def ensure_section(
                 meta={"status": "success"},
             )
 
+        final_meta = {
+            **meta,
+            "word_count": word_count,
+            "char_count": char_count,
+            "sources_used": sources_used,
+        }
+
+        if practice_validation:
+            final_meta["practice_validation"] = practice_validation
+
         return {
             "content_text": content_text,
             "format": DocumentArtifact.Format.MARKDOWN,
-            "meta": {
-                **meta,
-                "word_count": word_count,
-                "char_count": char_count,
-                "sources_used": sources_used,
-            },
+            "meta": final_meta,
         }
 
     try:

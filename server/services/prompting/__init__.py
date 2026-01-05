@@ -20,6 +20,12 @@ from .tokens import (
     estimate_json_tokens,
     estimate_messages_tokens
 )
+from .validators import (
+    PracticeValidationResult,
+    validate_practice_content,
+    is_practice_section,
+    get_validation_summary,
+)
 
 __all__ = [
     "ContextPack",
@@ -43,4 +49,8 @@ __all__ = [
     "estimate_text_tokens",
     "estimate_json_tokens",
     "estimate_messages_tokens",
+    "PracticeValidationResult",
+    "validate_practice_content",
+    "is_practice_section",
+    "get_validation_summary",
 ]
