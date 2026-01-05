@@ -436,6 +436,217 @@ def get_edit_plan(request, document_id):
 
 
 @extend_schema(
+    description="Run full pipeline from scratch - creates document and generates content",
+    tags=["Pipeline"]
+)
+@api_view(['POST'])
+def run_pipeline_full(request):
+    from services.pipeline.work_types import get_work_type_preset
+
+    work_type = request.data.get('work_type', 'referat')
+    profile_name = request.data.get('profile', 'default')
+    topic_title = request.data.get('topic_title', 'Разработка программного обеспечения')
+    topic_description = request.data.get('topic_description', '')
+    facts_data = request.data.get('facts')
+    mock_mode = request.data.get('mock_mode', False)
+    stop_after = request.data.get('stop_after')
+
+    try:
+        get_profile(profile_name)
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        preset = get_work_type_preset(work_type)
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    project = Project.objects.create(
+        repo_url="https://github.com/user/project",
+    )
+
+    analysis_run = AnalysisRun.objects.create(
+        project=project,
+        status=AnalysisRun.Status.SUCCESS,
+    )
+
+    facts_to_save = facts_data if facts_data else {
+        "repo": {"url": "https://github.com/user/project", "commit": "abc123"},
+        "languages": [{"name": "Python", "ratio": 0.8, "lines_of_code": 5000}],
+        "frameworks": [{"name": "Django", "type": "backend", "version": "5.0"}],
+        "architecture": {"type": "layered", "layers": ["api", "services", "models"]},
+        "modules": [],
+        "api": {"endpoints": []},
+        "models": [],
+    }
+
+    Artifact.objects.create(
+        analysis_run=analysis_run,
+        kind=Artifact.Kind.FACTS,
+        data=facts_to_save,
+    )
+
+    doc_type_map = {
+        'referat': Document.Type.REFERAT,
+        'course': Document.Type.COURSE,
+        'diploma': Document.Type.DIPLOMA,
+    }
+
+    document = Document.objects.create(
+        analysis_run=analysis_run,
+        type=doc_type_map.get(work_type, Document.Type.COURSE),
+        language="ru-RU",
+        target_pages=preset.target_pages[1],
+        params={
+            "title": topic_title,
+            "topic": topic_title,
+            "topic_description": topic_description,
+            "work_type": work_type,
+        },
+    )
+
+    from services.pipeline.specs import get_sections_for_work_type
+    section_specs = get_sections_for_work_type(work_type)
+
+    sections_created = []
+    for spec in section_specs:
+        section = Section.objects.create(
+            document=document,
+            key=spec.key,
+            chapter_key=spec.chapter_key,
+            depth=spec.depth,
+            title=spec.title,
+            order=spec.order,
+            status=Section.Status.IDLE,
+        )
+        sections_created.append({
+            'key': spec.key,
+            'chapter_key': spec.chapter_key,
+            'depth': spec.depth,
+            'title': spec.title,
+            'order': spec.order,
+        })
+
+    if stop_after == 'outline':
+        return Response({
+            'status': 'success',
+            'result': {
+                'document_id': str(document.id),
+                'sections_count': len(sections_created),
+                'sections_created': sections_created,
+                'stop_after': stop_after,
+                'outline': {
+                    'title': topic_title,
+                    'work_type': work_type,
+                    'sections': sections_created,
+                },
+            }
+        })
+
+    runner = DocumentRunner(
+        document_id=document.id,
+        profile=profile_name,
+        mock_mode=mock_mode,
+    )
+
+    job_id = uuid_module.uuid4()
+
+    import time
+    start_time = time.time()
+
+    section_keys_to_run = None
+    if stop_after:
+        key_mapping = {
+            'intro': ['intro'],
+            'intro_theory': ['intro', 'theory_1', 'theory_2', 'theory_3'],
+            'theory': ['theory_1', 'theory_2', 'theory_3'],
+            'practice': ['practice_1', 'practice_2', 'practice_3'],
+            'intro_practice': ['intro', 'practice_1', 'practice_2', 'practice_3'],
+            'sections': None,
+        }
+        section_keys_to_run = key_mapping.get(stop_after)
+
+    try:
+        if section_keys_to_run is not None:
+            result_artifacts_created = []
+            result_artifacts_cached = []
+            result_errors = []
+
+            for key in section_keys_to_run:
+                section_exists = document.sections.filter(key=key).exists()
+                if not section_exists:
+                    continue
+                try:
+                    result = runner.run_section(section_key=key, job_id=job_id, force=False)
+                    result_artifacts_created.extend(result.artifacts_created)
+                    result_artifacts_cached.extend(result.artifacts_cached)
+                    if result.errors:
+                        result_errors.extend(result.errors)
+                except Exception as e:
+                    result_errors.append(str(e))
+
+            class RunResult:
+                def __init__(self):
+                    self.success = len(result_errors) == 0
+                    self.artifacts_created = result_artifacts_created
+                    self.artifacts_cached = result_artifacts_cached
+                    self.errors = result_errors
+
+            result = RunResult()
+        else:
+            result = runner.run_full(job_id=job_id, force=False)
+
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        sections_data = []
+        total_words = 0
+        for section in document.sections.all().order_by('order'):
+            text = section.text_current or ''
+            word_count = len(text.split())
+            total_words += word_count
+            sections_data.append({
+                'key': section.key,
+                'chapter_key': section.chapter_key,
+                'title': section.title,
+                'text': text[:2000] if len(text) > 2000 else text,
+                'word_count': word_count,
+            })
+
+        response_data = {
+            'status': 'success',
+            'result': {
+                'document_id': str(document.id),
+                'sections_count': len(sections_data),
+                'total_words': total_words,
+                'sections': sections_data,
+                'stop_after': stop_after,
+                'outline': {
+                    'title': topic_title,
+                    'work_type': work_type,
+                    'sections': sections_created,
+                },
+                'run_result': {
+                    'success': result.success,
+                    'artifacts_created': result.artifacts_created,
+                    'artifacts_cached': result.artifacts_cached,
+                    'errors': result.errors,
+                    'duration_ms': duration_ms,
+                },
+            }
+        }
+
+        return Response(response_data)
+
+    except Exception as e:
+        import traceback
+        return Response({
+            'status': 'error',
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(
     description="Create test document with sample facts for pipeline testing",
     tags=["Pipeline"]
 )

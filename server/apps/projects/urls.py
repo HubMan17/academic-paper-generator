@@ -34,4 +34,5 @@ urlpatterns = [
     path('pipeline/profiles/', pipeline_views.get_profiles, name='get_profiles'),
     path('pipeline/sections/', pipeline_views.get_pipeline_sections, name='get_pipeline_sections'),
     path('pipeline/test-document/', pipeline_views.create_test_document, name='create_test_document'),
+    path('pipeline/run/', pipeline_views.run_pipeline_full, name='run_pipeline_full'),
 ]
