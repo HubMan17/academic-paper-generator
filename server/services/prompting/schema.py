@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Optional, Any
 from enum import Enum
 
+PROMPT_VERSION = "v1.0.0"
+
 
 class OutlineMode(str, Enum):
     FULL = "full"
@@ -54,6 +56,8 @@ class ContextPack:
     rendered_prompt: RenderedPrompt
     budget: Budget
     debug: DebugInfo
+    prompt_version: str = PROMPT_VERSION
+    prompt_fingerprint: str = ""
 
 
 @dataclass

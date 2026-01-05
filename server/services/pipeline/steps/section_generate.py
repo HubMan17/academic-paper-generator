@@ -74,6 +74,8 @@ def ensure_section(
             )
 
         output_report = None
+        prompt_version = context_pack_artifact.data_json.get("prompt_version", "unknown")
+        prompt_fingerprint = context_pack_artifact.data_json.get("prompt_fingerprint", "")
 
         if mock_mode:
             title = spec.title if spec else section.title
@@ -82,6 +84,8 @@ def ensure_section(
                 "mock": True,
                 "profile": profile,
                 "context_pack_artifact_id": str(context_pack_artifact.id),
+                "prompt_version": prompt_version,
+                "prompt_fingerprint": prompt_fingerprint,
             }
             llm_trace_data = None
         else:
@@ -123,6 +127,8 @@ def ensure_section(
                 "cost_estimate": result.meta.cost_estimate,
                 "profile": profile,
                 "context_pack_artifact_id": str(context_pack_artifact.id),
+                "prompt_version": prompt_version,
+                "prompt_fingerprint": prompt_fingerprint,
             }
 
             llm_trace_data = {
@@ -135,6 +141,8 @@ def ensure_section(
                 "estimated_input_tokens": estimated_tokens,
                 "estimation_error_ratio": estimation_error,
                 "context_pack_artifact_id": str(context_pack_artifact.id),
+                "prompt_version": prompt_version,
+                "prompt_fingerprint": prompt_fingerprint,
             }
 
             report_kind = ArtifactKind.section_report(section_key)

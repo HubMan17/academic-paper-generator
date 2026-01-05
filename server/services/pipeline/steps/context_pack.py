@@ -89,6 +89,8 @@ def ensure_context_pack(
 
         context_pack_data = {
             "section_key": context_pack.section_key,
+            "prompt_version": context_pack.prompt_version,
+            "prompt_fingerprint": context_pack.prompt_fingerprint,
             "selected_facts": {
                 "keys": selected_fact_keys,
                 "tags": selected_fact_tags,
@@ -133,6 +135,8 @@ def ensure_context_pack(
             "meta": {
                 "profile": profile,
                 "estimated_tokens": context_pack.budget.estimated_input_tokens,
+                "prompt_version": context_pack.prompt_version,
+                "prompt_fingerprint": context_pack.prompt_fingerprint,
             },
         }
 

@@ -1,9 +1,33 @@
+import hashlib
+import json
 from typing import Any
-from .schema import ContextPack, DebugInfo, Budget, SectionSpec
+from .schema import ContextPack, DebugInfo, Budget, SectionSpec, RenderedPrompt, PROMPT_VERSION
 from .registry import get_section_spec
 from .selectors import select_facts
 from .assembler import assemble_context, render_prompt
 from .budget import DEFAULT_BUDGET, trim_context
+
+
+def compute_prompt_fingerprint(
+    rendered: RenderedPrompt,
+    spec_key: str,
+    fact_ids: list[str],
+    budget: Budget
+) -> str:
+    payload = {
+        "prompt_version": PROMPT_VERSION,
+        "spec_key": spec_key,
+        "system": rendered.system,
+        "user": rendered.user,
+        "fact_ids": sorted(fact_ids),
+        "budget": {
+            "max_input_tokens_approx": budget.max_input_tokens_approx,
+            "max_output_tokens": budget.max_output_tokens,
+            "soft_char_limit": budget.soft_char_limit
+        }
+    }
+    payload_str = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload_str.encode('utf-8')).hexdigest()[:16]
 
 
 def slice_for_section(
@@ -52,10 +76,20 @@ def slice_for_section(
         trims_applied=trims_applied
     )
 
+    fact_ids = [ref.fact_id for ref in fact_refs]
+    fingerprint = compute_prompt_fingerprint(
+        rendered=rendered,
+        spec_key=section_key,
+        fact_ids=fact_ids,
+        budget=final_budget
+    )
+
     return ContextPack(
         section_key=section_key,
         layers=trimmed_layers,
         rendered_prompt=rendered,
         budget=final_budget,
-        debug=debug
+        debug=debug,
+        prompt_version=PROMPT_VERSION,
+        prompt_fingerprint=fingerprint
     )
