@@ -11,6 +11,7 @@ def assemble_context(
     global_context: str = ""
 ) -> ContextLayer:
     outline_excerpt = _extract_outline_excerpt(outline, spec.outline_mode, spec.key)
+    outline_points = _extract_section_points(outline, spec.key)
     facts_slice = _format_facts(selected_facts)
     summaries_text = _format_summaries(summaries)
     constraints_text = _format_constraints(spec)
@@ -18,6 +19,7 @@ def assemble_context(
     return ContextLayer(
         global_context=global_context,
         outline_excerpt=outline_excerpt,
+        outline_points=outline_points,
         facts_slice=facts_slice,
         summaries=summaries_text,
         constraints=constraints_text
@@ -60,6 +62,9 @@ def _build_user_prompt(spec: SectionSpec, layers: ContextLayer) -> str:
     if layers.outline_excerpt:
         sections.append(f"# OUTLINE\n{layers.outline_excerpt}")
 
+    if layers.outline_points:
+        sections.append(f"# OUTLINE POINTS FOR THIS SECTION\n{layers.outline_points}\n\nОБЯЗАТЕЛЬНО покрой каждый из перечисленных пунктов в тексте секции.")
+
     if layers.facts_slice:
         sections.append(f"# FACTS\n{layers.facts_slice}")
 
@@ -72,6 +77,24 @@ def _build_user_prompt(spec: SectionSpec, layers: ContextLayer) -> str:
     sections.append(f"\n# TASK\nСгенерируй секцию '{spec.key}' документа.")
 
     return "\n\n".join(sections)
+
+
+def _extract_section_points(outline: dict[str, Any], section_key: str) -> str:
+    if not outline or "sections" not in outline:
+        return ""
+
+    sections = outline.get("sections", [])
+    for section in sections:
+        if section.get("key") == section_key:
+            points = section.get("points", [])
+            if points:
+                lines = []
+                for i, point in enumerate(points, 1):
+                    lines.append(f"{i}. {point}")
+                return "\n".join(lines)
+            break
+
+    return ""
 
 
 def _extract_outline_excerpt(

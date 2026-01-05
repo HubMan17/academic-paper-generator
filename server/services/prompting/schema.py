@@ -28,6 +28,7 @@ class FactRef:
 class ContextLayer:
     global_context: str = ""
     outline_excerpt: str = ""
+    outline_points: str = ""
     facts_slice: str = ""
     summaries: str = ""
     constraints: str = ""

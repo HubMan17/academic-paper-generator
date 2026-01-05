@@ -270,3 +270,77 @@ def test_slice_with_explicit_spec(sample_facts, sample_outline):
     selected_tags = [ref.reason for ref in context_pack.debug.selected_fact_refs]
     has_expected_tags = any("tech_stack" in reason or "architecture" in reason for reason in selected_tags)
     assert has_expected_tags
+
+
+def test_outline_points_in_prompt():
+    outline_with_points = {
+        "title": "Test Document",
+        "sections": [
+            {
+                "key": "intro",
+                "title": "Introduction",
+                "order": 0,
+                "points": [
+                    "Describe project purpose",
+                    "List main technologies",
+                    "Explain scope"
+                ]
+            },
+            {
+                "key": "architecture",
+                "title": "Architecture",
+                "order": 1,
+                "points": ["Component diagram", "Data flow"]
+            }
+        ]
+    }
+
+    facts = {
+        "facts": [
+            {
+                "id": "fact_1",
+                "tags": ["project_name"],
+                "key_path": "project.name",
+                "text": "Test App",
+                "details": "Description"
+            }
+        ]
+    }
+
+    context_pack = slice_for_section(
+        section_key="intro",
+        facts=facts,
+        outline=outline_with_points,
+        summaries=[],
+        global_context="Test"
+    )
+
+    assert "1. Describe project purpose" in context_pack.layers.outline_points
+    assert "2. List main technologies" in context_pack.layers.outline_points
+    assert "3. Explain scope" in context_pack.layers.outline_points
+
+    assert "OUTLINE POINTS FOR THIS SECTION" in context_pack.rendered_prompt.user
+    assert "ОБЯЗАТЕЛЬНО покрой каждый из перечисленных пунктов" in context_pack.rendered_prompt.user
+    assert "Describe project purpose" in context_pack.rendered_prompt.user
+
+
+def test_outline_points_empty_when_no_points():
+    outline_no_points = {
+        "title": "Test Document",
+        "sections": [
+            {"key": "intro", "title": "Introduction", "order": 0}
+        ]
+    }
+
+    facts = {"facts": []}
+
+    context_pack = slice_for_section(
+        section_key="intro",
+        facts=facts,
+        outline=outline_no_points,
+        summaries=[],
+        global_context="Test"
+    )
+
+    assert context_pack.layers.outline_points == ""
+    assert "OUTLINE POINTS FOR THIS SECTION" not in context_pack.rendered_prompt.user

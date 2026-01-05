@@ -101,6 +101,7 @@ def ensure_context_pack(
             "layers": {
                 "global_context": context_pack.layers.global_context,
                 "outline_excerpt": context_pack.layers.outline_excerpt,
+                "outline_points": context_pack.layers.outline_points,
                 "facts_slice": context_pack.layers.facts_slice,
                 "summaries": context_pack.layers.summaries,
                 "constraints": context_pack.layers.constraints
