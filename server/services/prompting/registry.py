@@ -9,6 +9,10 @@ def register_section_spec(spec: SectionSpec) -> None:
 
 
 def get_section_spec(key: str) -> SectionSpec:
+    """
+    FALLBACK: Returns SectionSpec from registry or generates default.
+    Pipeline should pass explicit spec to slice_for_section() instead of relying on this.
+    """
     if key in _REGISTRY:
         return _REGISTRY[key]
 

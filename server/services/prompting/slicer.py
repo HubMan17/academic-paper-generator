@@ -1,5 +1,5 @@
 from typing import Any
-from .schema import ContextPack, DebugInfo, Budget
+from .schema import ContextPack, DebugInfo, Budget, SectionSpec
 from .registry import get_section_spec
 from .selectors import select_facts
 from .assembler import assemble_context, render_prompt
@@ -12,12 +12,14 @@ def slice_for_section(
     outline: dict[str, Any],
     summaries: list[dict[str, Any]] = None,
     global_context: str = "",
-    max_facts: int = 30
+    max_facts: int = 30,
+    spec: SectionSpec | None = None
 ) -> ContextPack:
     if summaries is None:
         summaries = []
 
-    spec = get_section_spec(section_key)
+    if spec is None:
+        spec = get_section_spec(section_key)
 
     selected_facts, fact_refs = select_facts(spec, facts, max_facts=max_facts)
 

@@ -77,6 +77,7 @@ def ensure_context_pack(
             summaries=summaries,
             global_context=global_context,
             max_facts=prof.max_facts,
+            spec=prompting_spec,
         )
 
         selected_fact_keys = [ref.fact_id for ref in context_pack.debug.selected_fact_refs]

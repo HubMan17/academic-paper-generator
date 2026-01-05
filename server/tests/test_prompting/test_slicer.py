@@ -1,5 +1,6 @@
 import pytest
 from services.prompting import slice_for_section, get_section_spec
+from services.prompting.schema import SectionSpec, OutlineMode
 
 
 @pytest.fixture
@@ -239,3 +240,33 @@ def test_slice_analyzer_facts_api(analyzer_facts, sample_outline):
         for ref in context_pack.debug.selected_fact_refs
     )
     assert has_api
+
+
+def test_slice_with_explicit_spec(sample_facts, sample_outline):
+    custom_spec = SectionSpec(
+        key="custom_section",
+        fact_tags=["tech_stack", "architecture"],
+        fact_keys=[],
+        outline_mode=OutlineMode.STRUCTURE,
+        needs_summaries=False,
+        style_profile="academic",
+        target_chars=(2000, 4000),
+        constraints=["Custom constraint 1", "Custom constraint 2"],
+    )
+
+    context_pack = slice_for_section(
+        section_key="custom_section",
+        facts=sample_facts,
+        outline=sample_outline,
+        summaries=[],
+        global_context="Test project",
+        spec=custom_spec
+    )
+
+    assert context_pack.section_key == "custom_section"
+    assert "Custom constraint 1" in context_pack.layers.constraints
+    assert "Custom constraint 2" in context_pack.layers.constraints
+
+    selected_tags = [ref.reason for ref in context_pack.debug.selected_fact_refs]
+    has_expected_tags = any("tech_stack" in reason or "architecture" in reason for reason in selected_tags)
+    assert has_expected_tags
