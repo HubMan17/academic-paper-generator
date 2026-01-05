@@ -13,25 +13,65 @@ from services.pipeline.profiles import get_profile
 
 logger = logging.getLogger(__name__)
 
-ACADEMIC_INTRO_SYSTEM_PROMPT_TEMPLATE = """You are writing the INTRODUCTION of an academic paper in Russian.
+ACADEMIC_INTRO_SYSTEM_PROMPT_TEMPLATE = """Ты пишешь ВВЕДЕНИЕ академической работы на русском языке.
 
-Your task:
-– Introduce the relevance of the topic
-– Describe the general context of modern software development
-– Explain the problem area and why it matters
-– Gradually lead the reader to the topic of the work
-– Formulate the goal and objectives of the work
+## ОБЯЗАТЕЛЬНАЯ СТРУКТУРА ВВЕДЕНИЯ (по ГОСТ 7.32-2001)
 
-STRICT RULES:
-– Do NOT mention specific technologies, frameworks, libraries, or tools
-– Do NOT describe implementation details
-– Do NOT analyze source code or repositories
-– Do NOT use bullet lists or numbered lists
-– Write in a formal academic style
-– The text must be logically coherent and suitable for a university paper
-– Write continuous prose paragraphs only
+Введение должно быть написано СПЛОШНЫМ ТЕКСТОМ без нумерованных подзаголовков.
+В тексте должны быть ПОСЛЕДОВАТЕЛЬНО раскрыты следующие элементы:
 
-Target length: {target_words} words in Russian."""
+1. **Актуальность темы** (1-2 абзаца)
+   - Почему эта тема важна сейчас?
+   - Какие тенденции в отрасли делают её актуальной?
+   - Какие проблемы существуют в данной области?
+
+2. **Цель работы** (1 предложение)
+   - Одна чётко сформулированная цель
+   - Начинается со слов: "Целью данной работы является..."
+
+3. **Задачи работы** (1 абзац)
+   - 4-6 конкретных задач для достижения цели
+   - Каждая задача = этап работы
+   - Формулировки: "изучить...", "проанализировать...", "разработать...", "реализовать...", "провести..."
+
+4. **Объект и предмет исследования** (1 абзац)
+   - Объект — ЧТО изучается (широкое понятие, область)
+   - Предмет — КАКОЙ АСПЕКТ объекта рассматривается (узкое, конкретное)
+
+5. **Методы исследования** (1 абзац)
+   - Теоретические: анализ литературы, обобщение, сравнение
+   - Практические: проектирование, моделирование, тестирование
+
+6. **Практическая значимость** (1 абзац)
+   - Кому будут полезны результаты работы?
+   - Где можно применить разработанное решение?
+
+7. **Структура работы** (1 абзац)
+   - Краткое описание содержания каждой главы
+   - "Работа состоит из введения, N глав, заключения и списка литературы..."
+
+## СТРОГИЕ ПРАВИЛА
+
+– НЕ упоминать конкретные технологии, фреймворки, библиотеки или инструменты
+– НЕ описывать детали реализации
+– НЕ анализировать исходный код
+– НЕ использовать маркированные или нумерованные списки
+– Писать в формальном академическом стиле
+– Текст должен быть логически связным и подходящим для университетской работы
+– Писать только сплошными абзацами
+
+PARAGRAPH STRUCTURE:
+– Break text into clear paragraphs (каждый элемент = отдельный абзац)
+– Each paragraph = 3-6 sentences
+– Use transitional phrases between paragraphs
+– AVOID walls of text longer than 8 sentences
+
+STYLE REQUIREMENTS:
+– Avoid watery phrases: "в современных условиях", "особое значение приобретает"
+– Be concrete and specific to the topic
+– Focus on substance, not filler
+
+Целевой объём: {target_words} слов на русском языке."""
 
 INTRO_WORD_LIMITS = {
     "referat": {"min": 300, "max": 500, "target": "350–450"},
@@ -39,16 +79,24 @@ INTRO_WORD_LIMITS = {
     "diploma": {"min": 600, "max": 1100, "target": "700–950"},
 }
 
-ACADEMIC_INTRO_USER_TEMPLATE = """Тема работы: {topic_title}
+ACADEMIC_INTRO_USER_TEMPLATE = """## ДАННЫЕ О РАБОТЕ
 
-Краткое описание работы:
+**Тема работы:** {topic_title}
+
+**Описание работы:**
 {topic_description}
 
-Тип работы: {work_type_name}
+**Тип работы:** {work_type_name}
 
-Язык: русский
+**Структура работы:**
+{work_structure}
 
-Напишите введение к данной работе, следуя академическому стилю изложения."""
+## ЗАДАНИЕ
+
+Напишите введение к данной работе, следуя академическому стилю изложения.
+Раскройте все обязательные элементы введения: актуальность, цель, задачи, объект и предмет, методы, практическую значимость и структуру работы.
+
+При описании структуры работы укажите содержание каждой главы на основе предоставленной информации."""
 
 FORBIDDEN_TECH_PATTERNS = [
     r'\bDjango\b', r'\bFlask\b', r'\bFastAPI\b', r'\bReact\b', r'\bVue\b', r'\bAngular\b',
@@ -64,6 +112,94 @@ FORBIDDEN_TECH_PATTERNS = [
 
 def count_words(text: str) -> int:
     return len(re.findall(r'\b\w+\b', text))
+
+
+WATERY_PHRASES = [
+    r'в современных условиях',
+    r'особое значение приобретает',
+    r'не вызывает сомнений',
+    r'общеизвестно',
+    r'как известно',
+    r'нельзя не отметить',
+    r'важно подчеркнуть',
+    r'следует отметить',
+    r'необходимо отметить',
+    r'играет важную роль',
+    r'имеет большое значение',
+    r'широко распространен',
+    r'активно развивается',
+    r'стремительно развивается',
+    r'всё большее распространение',
+    r'всё более актуальн',
+    r'особую актуальность',
+    r'повышенное внимание',
+    r'неуклонно возрастает',
+    r'постоянно растёт',
+    r'с каждым днём',
+    r'день ото дня',
+]
+
+
+def detect_wateriness(text: str) -> dict[str, Any]:
+    word_count = count_words(text)
+    if word_count == 0:
+        return {"watery_phrases": [], "density": 0.0, "acceptable": True}
+
+    watery_matches = []
+    for pattern in WATERY_PHRASES:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        watery_matches.extend(matches)
+
+    phrases_per_100_words = (len(watery_matches) / word_count) * 100
+    acceptable = phrases_per_100_words <= 3.0
+
+    return {
+        "watery_phrases": watery_matches,
+        "count": len(watery_matches),
+        "density": round(phrases_per_100_words, 2),
+        "acceptable": acceptable,
+    }
+
+
+def _extract_work_structure(document: Document) -> str:
+    outline = document.outline_current
+    if not outline or not outline.data_json:
+        return "Работа состоит из введения, теоретической части, практической части и заключения."
+
+    chapters = outline.data_json.get('chapters', [])
+    structure_parts = []
+
+    for chapter in chapters:
+        if chapter.get('is_auto'):
+            continue
+
+        key = chapter.get('key', '')
+        title = chapter.get('title', '')
+
+        if key == 'intro':
+            continue
+
+        if key == 'theory':
+            sections = chapter.get('sections', [])
+            if sections:
+                section_titles = [s.get('title', '') for s in sections[:3]]
+                structure_parts.append(f"Глава 1 ({title}) содержит разделы: {', '.join(section_titles)}")
+            else:
+                structure_parts.append(f"Глава 1: {title}")
+        elif key == 'practice':
+            sections = chapter.get('sections', [])
+            if sections:
+                section_titles = [s.get('title', '') for s in sections[:4]]
+                structure_parts.append(f"Глава 2 ({title}) содержит разделы: {', '.join(section_titles)}")
+            else:
+                structure_parts.append(f"Глава 2: {title}")
+        elif key == 'conclusion':
+            structure_parts.append(f"Заключение: выводы по результатам работы")
+
+    if not structure_parts:
+        return "Работа состоит из введения, теоретической части, практической части и заключения."
+
+    return "\n".join(structure_parts)
 
 
 def validate_intro_quality(text: str, work_type: str = "course") -> dict[str, Any]:
@@ -98,11 +234,19 @@ def validate_intro_quality(text: str, work_type: str = "course") -> dict[str, An
     if has_numbered_list:
         issues.append("Contains numbered lists (not allowed in intro)")
 
+    wateriness_info = detect_wateriness(text)
+    if not wateriness_info["acceptable"]:
+        issues.append(
+            f"Too watery: {wateriness_info['count']} filler phrases "
+            f"({wateriness_info['density']} per 100 words, max 3.0)"
+        )
+
     return {
         "valid": len(issues) == 0,
         "word_count": word_count,
         "issues": issues,
         "tech_terms_found": tech_found,
+        "wateriness": wateriness_info,
     }
 
 
@@ -142,6 +286,8 @@ def ensure_intro_academic(
             work_type_name = document.get_type_display()
             work_type_key = document.type
 
+        work_structure = _extract_work_structure(document)
+
         limits = INTRO_WORD_LIMITS.get(work_type_key, INTRO_WORD_LIMITS["course"])
         target_words = limits["target"]
 
@@ -161,6 +307,7 @@ def ensure_intro_academic(
                 topic_title=topic_title,
                 topic_description=topic_description,
                 work_type_name=work_type_name,
+                work_structure=work_structure,
             )
 
             budget = prof.get_budget_for_section(section_key)
