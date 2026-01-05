@@ -1,6 +1,6 @@
 import json
 from typing import Any
-from .schema import SectionSpec, ContextLayer, RenderedPrompt, OutlineMode
+from .schema import SectionSpec, ContextLayer, RenderedPrompt, OutlineMode, SECTION_OUTPUT_SCHEMA
 
 
 PRACTICE_SECTION_KEYS = {
@@ -102,6 +102,24 @@ def render_prompt(spec: SectionSpec, layers: ContextLayer) -> RenderedPrompt:
     return RenderedPrompt(system=system_prompt, user=user_prompt)
 
 
+JSON_OUTPUT_INSTRUCTION = """
+## ФОРМАТ ОТВЕТА
+
+Ты ДОЛЖЕН вернуть ответ в формате JSON со следующей структурой:
+{
+  "text": "<сгенерированный текст секции в Markdown>",
+  "facts_used": ["fact_id_1", "fact_id_2", ...],
+  "outline_points_covered": ["пункт 1", "пункт 2", ...],
+  "warnings": ["предупреждение 1", ...]
+}
+
+- text: полный текст секции
+- facts_used: ID фактов из раздела FACTS, которые ты использовал (в формате [id])
+- outline_points_covered: какие пункты из OUTLINE POINTS ты покрыл
+- warnings: если данных недостаточно, укажи какие аспекты не удалось раскрыть
+"""
+
+
 def _build_system_prompt(spec: SectionSpec) -> str:
     style_instructions = {
         "academic": "Используй строго академический стиль изложения.",
@@ -119,6 +137,7 @@ def _build_system_prompt(spec: SectionSpec) -> str:
 - НЕ добавляй факты, которых нет в предоставленных данных
 - Если информации недостаточно, пиши "нет данных" или опусти этот пункт
 - Ссылайся только на факты из раздела FACTS
+{JSON_OUTPUT_INSTRUCTION}
 """
 
 

@@ -67,3 +67,60 @@ class SectionSpec:
     target_chars: tuple[int, int] = (3000, 6000)
     constraints: list[str] = field(default_factory=list)
     chapter_key: str = ""
+
+
+SECTION_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "text": {
+            "type": "string",
+            "description": "Сгенерированный текст секции в формате Markdown"
+        },
+        "facts_used": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Список ID фактов из FACTS, которые были использованы в тексте"
+        },
+        "outline_points_covered": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Список пунктов outline, которые были покрыты в тексте"
+        },
+        "warnings": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Предупреждения о недостаточных данных или проблемах"
+        }
+    },
+    "required": ["text"],
+    "additionalProperties": False
+}
+
+
+@dataclass
+class SectionOutputReport:
+    text: str
+    facts_used: list[str] = field(default_factory=list)
+    outline_points_covered: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SectionOutputReport":
+        return cls(
+            text=data.get("text", ""),
+            facts_used=data.get("facts_used", []),
+            outline_points_covered=data.get("outline_points_covered", []),
+            warnings=data.get("warnings", [])
+        )
+
+    @classmethod
+    def from_text_fallback(cls, text: str) -> "SectionOutputReport":
+        return cls(text=text, warnings=["Model returned plain text, metadata not available"])
+
+    def to_dict(self) -> dict:
+        return {
+            "text": self.text,
+            "facts_used": self.facts_used,
+            "outline_points_covered": self.outline_points_covered,
+            "warnings": self.warnings
+        }

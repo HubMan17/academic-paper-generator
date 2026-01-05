@@ -6,7 +6,9 @@ from .schema import (
     ContextLayer,
     RenderedPrompt,
     DebugInfo,
-    OutlineMode
+    OutlineMode,
+    SectionOutputReport,
+    SECTION_OUTPUT_SCHEMA
 )
 from .registry import get_section_spec, list_section_keys
 from .slicer import slice_for_section
@@ -27,6 +29,8 @@ __all__ = [
     "RenderedPrompt",
     "DebugInfo",
     "OutlineMode",
+    "SectionOutputReport",
+    "SECTION_OUTPUT_SCHEMA",
     "get_section_spec",
     "list_section_keys",
     "slice_for_section",

@@ -1,6 +1,6 @@
 import pytest
 from services.prompting import slice_for_section, get_section_spec
-from services.prompting.schema import SectionSpec, OutlineMode
+from services.prompting.schema import SectionSpec, OutlineMode, SectionOutputReport
 
 
 @pytest.fixture
@@ -422,3 +422,77 @@ def test_practice_by_key_pattern():
         )
 
         assert "PRACTICE SECTION TEMPLATE" in context_pack.rendered_prompt.user, f"Failed for key: {key}"
+
+
+class TestSectionOutputReport:
+    def test_from_dict_full(self):
+        data = {
+            "text": "Generated content here",
+            "facts_used": ["fact_1", "fact_2"],
+            "outline_points_covered": ["Point 1", "Point 2"],
+            "warnings": ["Missing data for testing section"]
+        }
+
+        report = SectionOutputReport.from_dict(data)
+
+        assert report.text == "Generated content here"
+        assert report.facts_used == ["fact_1", "fact_2"]
+        assert report.outline_points_covered == ["Point 1", "Point 2"]
+        assert report.warnings == ["Missing data for testing section"]
+
+    def test_from_dict_minimal(self):
+        data = {"text": "Only text provided"}
+
+        report = SectionOutputReport.from_dict(data)
+
+        assert report.text == "Only text provided"
+        assert report.facts_used == []
+        assert report.outline_points_covered == []
+        assert report.warnings == []
+
+    def test_from_text_fallback(self):
+        plain_text = "This is plain text response without JSON"
+
+        report = SectionOutputReport.from_text_fallback(plain_text)
+
+        assert report.text == plain_text
+        assert len(report.warnings) == 1
+        assert "plain text" in report.warnings[0]
+
+    def test_to_dict(self):
+        report = SectionOutputReport(
+            text="Test text",
+            facts_used=["f1"],
+            outline_points_covered=["p1"],
+            warnings=["w1"]
+        )
+
+        result = report.to_dict()
+
+        assert result["text"] == "Test text"
+        assert result["facts_used"] == ["f1"]
+        assert result["outline_points_covered"] == ["p1"]
+        assert result["warnings"] == ["w1"]
+
+
+def test_json_output_instruction_in_system_prompt():
+    spec = SectionSpec(key="intro", chapter_key="intro")
+    outline = {"title": "Test", "sections": []}
+    facts = {"facts": []}
+
+    context_pack = slice_for_section(
+        section_key="intro",
+        facts=facts,
+        outline=outline,
+        summaries=[],
+        global_context="Test",
+        spec=spec
+    )
+
+    system_prompt = context_pack.rendered_prompt.system
+
+    assert "ФОРМАТ ОТВЕТА" in system_prompt
+    assert "JSON" in system_prompt
+    assert '"text"' in system_prompt
+    assert '"facts_used"' in system_prompt
+    assert '"outline_points_covered"' in system_prompt

@@ -7,6 +7,7 @@ class ArtifactKind(str, Enum):
     DOCUMENT_PROFILE = "document_profile:v1"
     CONTEXT_PACK = "context_pack:{key}:v1"
     SECTION = "section:{key}:v1"
+    SECTION_REPORT = "section_report:{key}:v1"
     SECTION_SUMMARY = "section_summary:{key}:v1"
     SECTION_ENRICHED = "section_enriched:{key}:v1"
     LLM_TRACE = "llm_trace:{key}:v1"
@@ -30,6 +31,10 @@ class ArtifactKind(str, Enum):
     @classmethod
     def section_enriched(cls, key: str) -> str:
         return cls.SECTION_ENRICHED.value.replace("{key}", key)
+
+    @classmethod
+    def section_report(cls, key: str) -> str:
+        return cls.SECTION_REPORT.value.replace("{key}", key)
 
     @classmethod
     def llm_trace(cls, key: str) -> str:

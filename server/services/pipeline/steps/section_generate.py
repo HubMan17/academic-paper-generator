@@ -1,5 +1,6 @@
 import logging
 import re
+import json
 from typing import Any
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from services.pipeline.ensure import ensure_artifact, get_success_artifact, inva
 from services.pipeline.kinds import ArtifactKind
 from services.pipeline.profiles import get_profile
 from services.pipeline.specs import get_section_spec
+from services.prompting.schema import SectionOutputReport, SECTION_OUTPUT_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,23 @@ MOCK_SECTION_TEXT = """# {title}
 
 def count_words(text: str) -> int:
     return len(re.findall(r'\b\w+\b', text))
+
+
+def _parse_section_output(data: dict | None, raw_text: str) -> SectionOutputReport:
+    if data and isinstance(data, dict) and "text" in data:
+        return SectionOutputReport.from_dict(data)
+
+    if raw_text:
+        try:
+            parsed = json.loads(raw_text)
+            if isinstance(parsed, dict) and "text" in parsed:
+                return SectionOutputReport.from_dict(parsed)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        return SectionOutputReport.from_text_fallback(raw_text)
+
+    return SectionOutputReport(text="", warnings=["Empty response from LLM"])
 
 
 def ensure_section(
@@ -70,6 +89,8 @@ def ensure_section(
                 profile=profile,
             )
 
+        output_report = None
+
         if mock_mode:
             title = spec.title if spec else section.title
             content_text = MOCK_SECTION_TEXT.format(title=title, key=section_key)
@@ -90,13 +111,16 @@ def ensure_section(
             budget = prof.get_budget_for_section(section_key)
             llm_client = LLMClient()
 
-            result = llm_client.generate_text(
+            result = llm_client.generate_json(
                 system=system_prompt,
                 user=user_prompt,
+                schema=SECTION_OUTPUT_SCHEMA,
                 temperature=budget.temperature,
                 max_tokens=budget.max_output_tokens,
             )
-            content_text = result.text
+
+            output_report = _parse_section_output(result.data, result.text)
+            content_text = output_report.text
 
             estimated_tokens = context_pack_artifact.data_json.get("budget", {}).get("estimated_input_tokens")
             actual_tokens = result.meta.prompt_tokens or 0
@@ -129,10 +153,31 @@ def ensure_section(
                 "context_pack_artifact_id": str(context_pack_artifact.id),
             }
 
+            report_kind = ArtifactKind.section_report(section_key)
+            DocumentArtifact.objects.create(
+                document=document,
+                section=section,
+                job_id=job_id,
+                kind=report_kind,
+                format=DocumentArtifact.Format.JSON,
+                data_json=output_report.to_dict(),
+                source="llm",
+                version="v1",
+                meta={
+                    "status": "success",
+                    "facts_used_count": len(output_report.facts_used),
+                    "outline_points_covered_count": len(output_report.outline_points_covered),
+                    "has_warnings": len(output_report.warnings) > 0,
+                },
+            )
+
         word_count = count_words(content_text)
         char_count = len(content_text)
 
-        sources_used = context_pack_artifact.data_json.get("selected_facts", {}).get("keys", [])
+        if output_report and output_report.facts_used:
+            sources_used = output_report.facts_used
+        else:
+            sources_used = context_pack_artifact.data_json.get("selected_facts", {}).get("keys", [])
 
         if llm_trace_data:
             DocumentArtifact.objects.create(
