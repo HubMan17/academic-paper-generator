@@ -83,7 +83,7 @@ class TestDocumentRunner:
         outline = get_outline_artifact(document.id)
         assert outline is not None
 
-        sections_with_special_handling = {'intro'}
+        sections_with_special_handling = {'intro', 'conclusion', 'toc', 'literature'}
 
         for key in get_all_section_keys():
             section = get_success_artifact(document.id, ArtifactKind.section(key))

@@ -153,8 +153,8 @@ def get_section_summaries(document: Document, chapter_key: str) -> str:
         summary_artifact = DocumentArtifact.objects.filter(
             document=document,
             section=section,
-            kind=ArtifactKind.summary(section.key),
-            status=DocumentArtifact.Status.SUCCESS,
+            kind=ArtifactKind.section_summary(section.key),
+            meta__status='success',
         ).order_by('-created_at').first()
 
         if summary_artifact and summary_artifact.content_text:

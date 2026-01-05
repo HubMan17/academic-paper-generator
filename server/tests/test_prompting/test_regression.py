@@ -269,10 +269,8 @@ class TestPR6_OutlineKeysMatchWorkType:
         assert 'conclusion' in keys
         assert 'theory_1' in keys
         assert 'theory_2' in keys
-        assert 'theory_3' in keys
         assert 'practice_1' in keys
         assert 'practice_2' in keys
-        assert 'practice_3' in keys
         assert 'toc' in keys
         assert 'literature' in keys
 

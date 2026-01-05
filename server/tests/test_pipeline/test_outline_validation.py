@@ -20,13 +20,11 @@ class TestGetAllowedSectionKeys:
         keys = get_allowed_section_keys('referat')
         assert 'theory_1' in keys
         assert 'theory_2' in keys
-        assert 'theory_3' in keys
 
     def test_referat_keys_include_practice_sections(self):
         keys = get_allowed_section_keys('referat')
         assert 'practice_1' in keys
         assert 'practice_2' in keys
-        assert 'practice_3' in keys
 
     def test_referat_keys_include_service_keys(self):
         keys = get_allowed_section_keys('referat')
@@ -176,7 +174,8 @@ class TestFilterOutlineSections:
         section_keys = [s['key'] for s in result['chapters'][0]['sections']]
         assert 'practice_1' in section_keys
         assert 'practice_2' in section_keys
-        assert 'practice_3' in section_keys
+        assert 'practice_3' not in section_keys
+        assert 'practice_10' not in section_keys
 
     def test_original_data_not_mutated(self):
         outline = {

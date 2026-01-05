@@ -62,14 +62,29 @@ ANTI_WATER_RULES = """
 """
 
 
+def is_practice_section(key_or_spec) -> bool:
+    if isinstance(key_or_spec, str):
+        key = key_or_spec
+        if key.startswith('practice_'):
+            return True
+        if key in PRACTICE_SECTION_KEYS:
+            return True
+        key_lower = key.lower()
+        practice_markers = ['practice', 'implementation', 'testing', 'architecture', 'api', 'analysis', 'design', 'development']
+        return any(marker in key_lower for marker in practice_markers)
+    else:
+        spec = key_or_spec
+        if spec.chapter_key == 'practice':
+            return True
+        if spec.key.startswith('practice_'):
+            return True
+        if spec.key in PRACTICE_SECTION_KEYS:
+            return True
+        return False
+
+
 def _is_practice_section(spec: SectionSpec) -> bool:
-    if spec.chapter_key == 'practice':
-        return True
-    if spec.key.startswith('practice_'):
-        return True
-    if spec.key in PRACTICE_SECTION_KEYS:
-        return True
-    return False
+    return is_practice_section(spec)
 
 
 def assemble_context(

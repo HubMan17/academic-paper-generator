@@ -265,11 +265,11 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
     prev_key = "intro"
     theory_base_order = order
     theory_tag_keys = list(THEORY_SECTION_TAGS.keys())
-    for i in range(preset.theory_sections_count):
+    for i, (sec_key, sec_title, sec_words) in enumerate(preset.theory_sections):
         full_key = f"theory_{i+1}"
         tag_key = theory_tag_keys[i % len(theory_tag_keys)] if theory_tag_keys else 'concepts'
         fact_tags = THEORY_SECTION_TAGS.get(tag_key, ['tech_stack', 'frameworks'])
-        target_words = preset.get_section_target_words('theory', i)
+        target_words = sec_words
         word_range = (max(400, target_words - 200), target_words + 200)
         sections.append(PipelineSectionSpec(
             key=full_key,
@@ -290,13 +290,14 @@ def get_sections_for_work_type(work_type: str) -> list[PipelineSectionSpec]:
 
     practice_base_order = order
     practice_tag_keys = list(PRACTICE_SECTION_TAGS.keys())
-    for i in range(preset.practice_sections_count):
+    practice_sections_count = len(preset.practice_sections)
+    for i, (sec_key, sec_title, sec_words) in enumerate(preset.practice_sections):
         full_key = f"practice_{i+1}"
         tag_key = practice_tag_keys[i % len(practice_tag_keys)] if practice_tag_keys else 'analysis'
         fact_tags = PRACTICE_SECTION_TAGS.get(tag_key, ['modules', 'models'])
-        target_words = preset.get_section_target_words('practice', i)
+        target_words = sec_words
         word_range = (max(400, target_words - 200), target_words + 200)
-        is_impl_or_test = i >= (preset.practice_sections_count - 2)
+        is_impl_or_test = i >= (practice_sections_count - 2)
         sections.append(PipelineSectionSpec(
             key=full_key,
             title=f"2.{i+1} Раздел практики",

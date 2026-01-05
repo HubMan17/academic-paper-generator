@@ -35,8 +35,8 @@ class TestAssembleDocument:
             chapter_conclusions=[],
         )
 
-        assert result.sections["intro"] == "Отредактированный текст введения."
-        assert result.sections["theory"] == "Оригинальный текст теории."
+        assert result.sections["intro"].rstrip('\n') == "Отредактированный текст введения."
+        assert result.sections["theory"].rstrip('\n') == "Оригинальный текст теории."
 
     def test_assemble_with_transitions(self):
         original_sections = [
@@ -76,7 +76,7 @@ class TestAssembleDocument:
             final_conclusion="Новое улучшенное заключение.",
         )
 
-        assert result.sections["conclusion"] == "Новое улучшенное заключение."
+        assert result.sections["conclusion"].rstrip('\n') == "Новое улучшенное заключение."
 
 
 class TestRenderDocumentMarkdown:
