@@ -108,7 +108,8 @@ def ensure_section(
                 max_tokens=budget.max_output_tokens,
             )
 
-            output_report = _parse_section_output(result.data, result.text)
+            raw_text = json.dumps(result.data, ensure_ascii=False) if result.data else ""
+            output_report = _parse_section_output(result.data, raw_text)
             content_text = output_report.text
 
             estimated_tokens = context_pack_artifact.data_json.get("budget", {}).get("estimated_input_tokens")
