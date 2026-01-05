@@ -183,8 +183,8 @@ class TestAssemblerPracticeGuardrails:
 
         spec = SectionSpec(key="implementation")
         prompt = _build_system_prompt(spec)
-        assert "ОБЯЗАТЕЛЬНЫЕ ТРЕБОВАНИЯ" in prompt
-        assert "КОНКРЕТНЫЕ СУЩНОСТИ" in prompt
+        assert "ОБЯЗАТЕЛЬНЫЙ МИНИМУМ" in prompt
+        assert "СУЩНОСТИ ИЗ FACTS" in prompt
         assert "АЛГОРИТМ" in prompt
         assert "ТАБЛИЦА" in prompt
 
@@ -194,7 +194,7 @@ class TestAssemblerPracticeGuardrails:
 
         spec = SectionSpec(key="intro")
         prompt = _build_system_prompt(spec)
-        assert "ОБЯЗАТЕЛЬНЫЕ ТРЕБОВАНИЯ ДЛЯ ПРАКТИЧЕСКОЙ ЧАСТИ" not in prompt
+        assert "СТРОГИЕ ТРЕБОВАНИЯ ДЛЯ ПРАКТИЧЕСКОЙ ЧАСТИ" not in prompt
 
     def test_is_practice_section_function(self):
         from services.prompting.assembler import _is_practice_section
