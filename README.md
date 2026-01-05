@@ -44,12 +44,17 @@ academic-paper-generator/
 │   ├── apps/                       # Django applications
 │   │   ├── core/                   # Core (test page, API endpoints)
 │   │   ├── accounts/               # Auth & users (TODO)
-│   │   └── projects/               # Projects & sections (TODO)
+│   │   └── projects/               # Projects, documents, sections, artifacts
 │   ├── services/
-│   │   └── analyzer/               # Repo Analyzer (8 модулей)
+│   │   ├── analyzer/               # Repo Analyzer - facts extraction
+│   │   ├── llm/                    # LLM Client - OpenAI integration
+│   │   ├── prompting/              # Context Packs & Slicing
+│   │   ├── pipeline/               # Document Pipeline orchestration
+│   │   ├── enrichment/             # Section enrichment from facts
+│   │   └── editor/                 # Grounded editing (L1/L2/L3)
 │   ├── tasks/                      # Celery tasks
 │   ├── templates/                  # Django templates
-│   ├── tests/                      # Backend tests
+│   ├── tests/                      # Backend tests (120+ tests)
 │   ├── manage.py
 │   └── requirements.txt
 │
@@ -65,7 +70,8 @@ academic-paper-generator/
 │   └── package.json
 │
 ├── docs/
-│   └── spec/                       # Спецификация проекта
+│   ├── spec/                       # Спецификация проекта
+│   └── PROMPTING_PLAYBOOK.md       # Technical docs for content quality
 │
 └── README.md
 ```
@@ -131,9 +137,31 @@ npm run dev
 }
 ```
 
+## Quality Guarantees
+
+The system implements several mechanisms to ensure high-quality, traceable output:
+
+### Traceability
+- **Prompt Versioning**: Every generated artifact includes `prompt_version`
+- **Prompt Fingerprint**: SHA256 hash of (system_prompt + user_prompt + facts + budget)
+- **Artifact Chain**: section → context_pack → facts, fully traceable
+
+### Groundedness
+- **Editor Levels**: L1 (basic), L2 (medium), L3 (university-grade)
+- **Grounding Rule**: L2/L3 can only use information from original text + facts
+- **facts_used Tracking**: Every edit declares which facts were used
+
+### Anti-Template Measures
+- **Practice Guardrails**: Require entities, algorithms, tables in practice sections
+- **Content Validation**: Automatic scoring of practice content (0-1 scale)
+- **Terminology Consistency**: Detect mixed synonym usage
+
+See [docs/PROMPTING_PLAYBOOK.md](docs/PROMPTING_PLAYBOOK.md) for technical details.
+
 ## Документация
 
-Полная спецификация проекта находится в [docs/spec/](docs/spec/).
+- [docs/spec/](docs/spec/) - Спецификация проекта
+- [docs/PROMPTING_PLAYBOOK.md](docs/PROMPTING_PLAYBOOK.md) - Техническая документация по качеству генерации
 
 ## Лицензия
 
