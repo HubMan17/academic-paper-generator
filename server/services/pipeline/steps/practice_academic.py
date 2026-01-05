@@ -32,6 +32,17 @@ For ARCHITECTURE sections: describe system structure, components, design decisio
 For IMPLEMENTATION sections: describe key algorithms, data flows, core functionality
 For TESTING sections: describe testing strategy, test coverage, quality assurance
 
+PARAGRAPH STRUCTURE:
+– Break text into paragraphs every 3-5 sentences
+– Each paragraph = one component/feature/aspect
+– AVOID walls of text longer than 8 sentences
+
+CONTENT BALANCE:
+– 70% description of architecture/functionality/decisions
+– 20% technical context (generically)
+– 10% justification
+– Focus on WHAT WAS BUILT and WHY, not metrics
+
 Target length: {target_words} words in Russian.
 Write continuous prose paragraphs only."""
 

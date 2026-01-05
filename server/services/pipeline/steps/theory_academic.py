@@ -33,6 +33,17 @@ ALLOWED:
 – Reference academic concepts and methodologies
 – Use terms like "web application", "information system", "software system" generically
 
+PARAGRAPH STRUCTURE:
+– Break text into paragraphs every 3-5 sentences
+– Each paragraph = one idea or aspect
+– Use transitional phrases between paragraphs
+– AVOID walls of text longer than 8 sentences
+
+STYLE REQUIREMENTS:
+– Less abstraction, more concrete examples
+– Cite principles, NOT technologies
+– Ground abstract concepts in recognizable scenarios
+
 Target length: {target_words} words in Russian.
 Write continuous prose paragraphs only."""
 
@@ -75,6 +86,53 @@ FORBIDDEN_PATTERNS = [
 
 def count_words(text: str) -> int:
     return len(re.findall(r'\b\w+\b', text))
+
+
+WATERY_PHRASES = [
+    r'в современных условиях',
+    r'особое значение приобретает',
+    r'не вызывает сомнений',
+    r'общеизвестно',
+    r'как известно',
+    r'нельзя не отметить',
+    r'важно подчеркнуть',
+    r'следует отметить',
+    r'необходимо отметить',
+    r'играет важную роль',
+    r'имеет большое значение',
+    r'широко распространен',
+    r'активно развивается',
+    r'стремительно развивается',
+    r'всё большее распространение',
+    r'всё более актуальн',
+    r'особую актуальность',
+    r'повышенное внимание',
+    r'неуклонно возрастает',
+    r'постоянно растёт',
+    r'с каждым днём',
+    r'день ото дня',
+]
+
+
+def detect_wateriness(text: str) -> dict[str, Any]:
+    word_count = count_words(text)
+    if word_count == 0:
+        return {"watery_phrases": [], "density": 0.0, "acceptable": True}
+
+    watery_matches = []
+    for pattern in WATERY_PHRASES:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        watery_matches.extend(matches)
+
+    phrases_per_100_words = (len(watery_matches) / word_count) * 100
+    acceptable = phrases_per_100_words <= 3.0
+
+    return {
+        "watery_phrases": watery_matches,
+        "count": len(watery_matches),
+        "density": round(phrases_per_100_words, 2),
+        "acceptable": acceptable,
+    }
 
 
 def validate_theory_quality(
@@ -120,11 +178,19 @@ def validate_theory_quality(
     if has_numbered_list:
         issues.append("Contains numbered lists (not allowed in theory)")
 
+    wateriness_info = detect_wateriness(text)
+    if not wateriness_info["acceptable"]:
+        issues.append(
+            f"Too watery: {wateriness_info['count']} filler phrases "
+            f"({wateriness_info['density']} per 100 words, max 3.0)"
+        )
+
     return {
         "valid": len(issues) == 0,
         "word_count": word_count,
         "issues": issues,
         "forbidden_terms_found": forbidden_found,
+        "wateriness": wateriness_info,
     }
 
 
@@ -194,7 +260,11 @@ def ensure_theory_section(
         section_points, _ = get_section_points_from_outline(document, section_key)
         points_text = "\n".join(f"– {p}" for p in section_points) if section_points else "Раскрыть основные теоретические аспекты темы"
 
-        preset_target = preset.get_section_target_words(section_key)
+        if section_key.startswith('theory_') and '_' in section_key:
+            section_index = int(section_key.split('_')[1]) - 1
+        else:
+            section_index = 0
+        preset_target = preset.get_section_target_words('theory', section_index)
 
         if is_subsection:
             limits = SUBSECTION_WORD_LIMITS.get(work_type_key, SUBSECTION_WORD_LIMITS["course"])

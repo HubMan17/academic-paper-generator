@@ -10,6 +10,7 @@ from services.pipeline.steps.literature import ensure_literature, format_literat
 from services.pipeline.steps.intro_academic import ensure_intro_academic, validate_intro_quality
 from services.pipeline.steps.theory_academic import ensure_theory_section, validate_theory_quality
 from services.pipeline.steps.practice_academic import ensure_practice_section, validate_practice_quality
+from services.pipeline.steps.conclusion_academic import ensure_conclusion_section, validate_conclusion_quality
 
 __all__ = [
     "ensure_outline",
@@ -31,4 +32,6 @@ __all__ = [
     "validate_theory_quality",
     "ensure_practice_section",
     "validate_practice_quality",
+    "ensure_conclusion_section",
+    "validate_conclusion_quality",
 ]
